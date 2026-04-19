@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ShieldAlert, Loader2 } from "lucide-react";
+import PasswordInput from "@/components/shared/PasswordInput";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -82,9 +83,8 @@ export default function Login() {
                   Forgot password?
                 </Link>
               </div>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

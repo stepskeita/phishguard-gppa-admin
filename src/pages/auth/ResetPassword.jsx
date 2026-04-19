@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ShieldAlert, Loader2 } from "lucide-react";
+import PasswordInput from "@/components/shared/PasswordInput";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -83,9 +84,8 @@ export default function ResetPassword() {
             )}
             <div className="space-y-2">
               <Label htmlFor="newPassword">New password</Label>
-              <Input
+              <PasswordInput
                 id="newPassword"
-                type="password"
                 placeholder="Min. 8 characters"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -95,9 +95,8 @@ export default function ResetPassword() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm">Confirm password</Label>
-              <Input
+              <PasswordInput
                 id="confirm"
-                type="password"
                 placeholder="Repeat new password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
