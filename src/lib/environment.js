@@ -3,7 +3,7 @@
  * Centralized configuration for API endpoints.
  */
 
-const isDev = true;
+const isDev = false;
 
 export const BACKEND_BASE_URL = isDev
   ? "http://localhost:5000"
