@@ -1,31 +1,108 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PageHeader from "../components/shared/PageHeader";
-
-const defaultHtml = `<!DOCTYPE html>
-<html>
-<head><title>Secure Login</title></head>
-<body style="font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f2f5;">
-  <div style="background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 360px;">
-    <h2 style="text-align:center; margin-bottom: 24px;">Sign In</h2>
-    <input type="email" placeholder="Email" style="width:100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" />
-    <input type="password" placeholder="Password" style="width:100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;" />
-    <button style="width:100%; padding: 12px; background: #0078d4; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 15px;">Sign In</button>
-  </div>
-</body>
-</html>`;
+import api from "@/api/axios";
 
 export default function CreateEditLandingPage() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const queryClient = useQueryClient();
   const isEdit = Boolean(id);
-  const [html, setHtml] = useState(isEdit ? defaultHtml : "");
+
+  const [name, setName] = useState("");
+  const [urlSlug, setUrlSlug] = useState("");
+  const [redirectUrl, setRedirectUrl] = useState("");
+  const [templateBase, setTemplateBase] = useState("blank");
+  const [status, setStatus] = useState("Draft");
+  const [htmlContent, setHtmlContent] = useState("");
+  const [sendingDomainId, setSendingDomainId] = useState("");
+
+  const { data: sendingDomains = [] } = useQuery({
+    queryKey: ["sending-domains"],
+    queryFn: () => api.get("/sending-domains").then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const { data: existing, isLoading: loadingPage } = useQuery({
+    queryKey: ["landing-page", id],
+    queryFn: () => api.get(`/landing-pages/${id}`).then((r) => r.data),
+    enabled: isEdit,
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (existing) {
+      setName(existing.name ?? "");
+      setUrlSlug(existing.urlSlug ?? "");
+      setRedirectUrl(existing.redirectUrl ?? "");
+      setTemplateBase(existing.templateBase ?? "blank");
+      setStatus(existing.status ?? "Draft");
+      setHtmlContent(existing.htmlContent ?? "");
+      setSendingDomainId(
+        existing.sendingDomainId?._id ?? existing.sendingDomainId ?? "",
+      );
+    }
+  }, [existing]);
+
+  const createMutation = useMutation({
+    mutationFn: (payload) => api.post("/landing-pages", payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["landing-pages"] });
+      toast.success("Landing page created");
+      navigate("/landing-pages");
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.error ?? "Failed to create landing page"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (payload) => api.put(`/landing-pages/${id}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["landing-pages"] });
+      queryClient.invalidateQueries({ queryKey: ["landing-page", id] });
+      toast.success("Landing page saved");
+      navigate("/landing-pages");
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.error ?? "Failed to save landing page"),
+  });
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
+  const handleSubmit = () => {
+    if (!name.trim()) {
+      toast.error("Page name is required");
+      return;
+    }
+    if (!urlSlug.trim()) {
+      toast.error("URL slug is required");
+      return;
+    }
+    const payload = {
+      name: name.trim(),
+      urlSlug: urlSlug.trim(),
+      redirectUrl: redirectUrl.trim(),
+      templateBase,
+      status,
+      htmlContent,
+      sendingDomainId: sendingDomainId || undefined,
+    };
+    isEdit ? updateMutation.mutate(payload) : createMutation.mutate(payload);
+  };
 
   return (
     <div>
@@ -40,24 +117,59 @@ export default function CreateEditLandingPage() {
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 bg-card border border-border rounded-xl p-6">
           <div className="space-y-2">
-            <Label>Page Name</Label>
-            <Input placeholder="e.g. Corporate Login Portal" defaultValue={isEdit ? "Corporate Login Portal" : ""} className="bg-secondary border-0" />
+            <Label>
+              Page Name <span className="text-destructive">*</span>
+            </Label>
+            {isEdit && loadingPage ? (
+              <Skeleton className="h-9 w-full rounded-lg" />
+            ) : (
+              <Input
+                placeholder="e.g. Corporate Login Portal"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="bg-secondary border-0"
+              />
+            )}
           </div>
           <div className="space-y-2">
-            <Label>URL Slug</Label>
+            <Label>
+              URL Slug <span className="text-destructive">*</span>
+            </Label>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground whitespace-nowrap">sim.phishguard.io/</span>
-              <Input placeholder="corp-login" defaultValue={isEdit ? "corp-login" : ""} className="bg-secondary border-0" />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                sim.phishguard.io/
+              </span>
+              {isEdit && loadingPage ? (
+                <Skeleton className="h-9 flex-1 rounded-lg" />
+              ) : (
+                <Input
+                  placeholder="corp-login"
+                  value={urlSlug}
+                  onChange={(e) => setUrlSlug(e.target.value)}
+                  className="bg-secondary border-0"
+                />
+              )}
             </div>
           </div>
           <div className="space-y-2">
             <Label>Redirect URL (after submit)</Label>
-            <Input placeholder="https://realsite.com/login" defaultValue={isEdit ? "https://company.com/login" : ""} className="bg-secondary border-0" />
+            {isEdit && loadingPage ? (
+              <Skeleton className="h-9 w-full rounded-lg" />
+            ) : (
+              <Input
+                placeholder="https://realsite.com/login"
+                value={redirectUrl}
+                onChange={(e) => setRedirectUrl(e.target.value)}
+                className="bg-secondary border-0"
+              />
+            )}
           </div>
           <div className="space-y-2">
             <Label>Template Base</Label>
-            <Select defaultValue={isEdit ? "microsoft" : undefined}>
-              <SelectTrigger className="bg-secondary border-0"><SelectValue placeholder="Start from template..." /></SelectTrigger>
+            <Select value={templateBase} onValueChange={setTemplateBase}>
+              <SelectTrigger className="bg-secondary border-0">
+                <SelectValue placeholder="Start from template..." />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="blank">Blank Page</SelectItem>
                 <SelectItem value="microsoft">Microsoft 365</SelectItem>
@@ -68,12 +180,31 @@ export default function CreateEditLandingPage() {
           </div>
           <div className="space-y-2">
             <Label>Status</Label>
-            <Select defaultValue={isEdit ? "active" : "draft"}>
-              <SelectTrigger className="bg-secondary border-0"><SelectValue /></SelectTrigger>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="bg-secondary border-0">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="Draft">Draft</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Sending Domain</Label>
+            <Select value={sendingDomainId} onValueChange={setSendingDomainId}>
+              <SelectTrigger className="bg-secondary border-0">
+                <SelectValue placeholder="Environment Default" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Environment Default</SelectItem>
+                {sendingDomains.map((d) => (
+                  <SelectItem key={d._id} value={d._id}>
+                    {d.name}
+                    {d.isDefault ? " (default)" : ""}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -87,11 +218,13 @@ export default function CreateEditLandingPage() {
           <TabsContent value="editor">
             <div className="bg-card border border-border rounded-xl overflow-hidden">
               <div className="px-4 py-2 border-b border-border bg-secondary/50">
-                <span className="text-xs font-mono text-muted-foreground">index.html</span>
+                <span className="text-xs font-mono text-muted-foreground">
+                  index.html
+                </span>
               </div>
               <textarea
-                value={html}
-                onChange={(e) => setHtml(e.target.value)}
+                value={htmlContent}
+                onChange={(e) => setHtmlContent(e.target.value)}
                 placeholder="Paste your HTML here..."
                 className="w-full h-96 bg-background text-foreground font-mono text-xs p-4 resize-none focus:outline-none"
               />
@@ -100,22 +233,43 @@ export default function CreateEditLandingPage() {
           <TabsContent value="preview">
             <div className="bg-card border border-border rounded-xl overflow-hidden">
               <div className="px-4 py-2 border-b border-border bg-secondary/50">
-                <span className="text-xs text-muted-foreground">Live Preview</span>
+                <span className="text-xs text-muted-foreground">
+                  Live Preview
+                </span>
               </div>
-              {html ? (
-                <iframe srcDoc={html} className="w-full h-96 border-0" title="Landing page preview" sandbox="allow-same-origin" />
+              {htmlContent ? (
+                <iframe
+                  srcDoc={htmlContent}
+                  className="w-full h-96 border-0"
+                  title="Landing page preview"
+                  sandbox="allow-same-origin"
+                />
               ) : (
-                <div className="h-96 flex items-center justify-center text-sm text-muted-foreground">Add HTML in the editor to see a preview</div>
+                <div className="h-96 flex items-center justify-center text-sm text-muted-foreground">
+                  Add HTML in the editor to see a preview
+                </div>
               )}
             </div>
           </TabsContent>
         </Tabs>
 
         <div className="flex items-center gap-3">
-          <Button onClick={() => { toast.success(isEdit ? "Landing page saved" : "Landing page created"); navigate("/landing-pages"); }}>
-            {isEdit ? "Save Changes" : "Create Landing Page"}
+          <Button onClick={handleSubmit} disabled={isPending}>
+            {isPending
+              ? isEdit
+                ? "Saving…"
+                : "Creating…"
+              : isEdit
+                ? "Save Changes"
+                : "Create Landing Page"}
           </Button>
-          <Button variant="outline" onClick={() => navigate("/landing-pages")}>Cancel</Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/landing-pages")}
+            disabled={isPending}
+          >
+            Cancel
+          </Button>
         </div>
       </div>
     </div>

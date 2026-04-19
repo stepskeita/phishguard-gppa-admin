@@ -119,9 +119,9 @@ export default function TrackingLogs() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Actions</SelectItem>
-            <SelectItem value="clicked">Clicked</SelectItem>
-            <SelectItem value="submitted">Submitted</SelectItem>
-            <SelectItem value="ignored">Ignored</SelectItem>
+            <SelectItem value="Clicked">Clicked</SelectItem>
+            <SelectItem value="Submitted">Submitted</SelectItem>
+            <SelectItem value="Ignored">Ignored</SelectItem>
           </SelectContent>
         </Select>
         <Input

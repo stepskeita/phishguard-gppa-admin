@@ -47,7 +47,7 @@ export default function LandingPagesList() {
       accessor: "url",
       render: (row) => (
         <span className="text-xs text-muted-foreground font-mono">
-          {row.url}
+          {row.urlSlug}
         </span>
       ),
     },

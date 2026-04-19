@@ -26,6 +26,7 @@ const STEPS = [
   "Email Template",
   "Landing Page",
   "Schedule",
+  "Sending Config",
   "Review",
 ];
 
@@ -39,6 +40,8 @@ const INITIAL = {
   startTime: "",
   timezone: "UTC",
   status: "Draft",
+  smtpConfigId: "",
+  sendingDomainId: "",
 };
 
 export default function CreateCampaign() {
@@ -75,6 +78,18 @@ export default function CreateCampaign() {
   });
   const landingPages = landingPagesRes?.data ?? [];
 
+  const { data: smtpConfigs = [] } = useQuery({
+    queryKey: ["smtp-configs"],
+    queryFn: () => api.get("/smtp-configs").then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const { data: sendingDomains = [] } = useQuery({
+    queryKey: ["sending-domains"],
+    queryFn: () => api.get("/sending-domains").then((r) => r.data),
+    staleTime: 60_000,
+  });
+
   const { data: existingCampaign, isLoading: campaignLoading } = useQuery({
     queryKey: ["campaign", id],
     queryFn: () => api.get(`/campaigns/${id}`).then((r) => r.data),
@@ -101,6 +116,14 @@ export default function CreateCampaign() {
         landingPageId:
           existingCampaign.landingPageId?._id ??
           existingCampaign.landingPageId ??
+          "",
+        smtpConfigId:
+          existingCampaign.smtpConfigId?._id ??
+          existingCampaign.smtpConfigId ??
+          "",
+        sendingDomainId:
+          existingCampaign.sendingDomainId?._id ??
+          existingCampaign.sendingDomainId ??
           "",
         startDate: startDt ? startDt.toISOString().split("T")[0] : "",
         startTime: startDt ? startDt.toTimeString().slice(0, 5) : "",
@@ -161,6 +184,8 @@ export default function CreateCampaign() {
       targetGroupIds: form.targetGroupIds,
       emailTemplateId: form.emailTemplateId || undefined,
       landingPageId: form.landingPageId || undefined,
+      smtpConfigId: form.smtpConfigId || undefined,
+      sendingDomainId: form.sendingDomainId || undefined,
       timezone: form.timezone,
       status: form.status,
     };
@@ -194,6 +219,15 @@ export default function CreateCampaign() {
   const selectedGroups = useMemo(
     () => groups.filter((g) => form.targetGroupIds.includes(g._id)),
     [groups, form.targetGroupIds],
+  );
+
+  const selectedSmtpConfig = useMemo(
+    () => smtpConfigs.find((c) => c._id === form.smtpConfigId),
+    [smtpConfigs, form.smtpConfigId],
+  );
+  const selectedSendingDomain = useMemo(
+    () => sendingDomains.find((d) => d._id === form.sendingDomainId),
+    [sendingDomains, form.sendingDomainId],
   );
 
   const isPageLoading = isEdit && campaignLoading;
@@ -593,8 +627,205 @@ export default function CreateCampaign() {
             </div>
           )}
 
-          {/* Step 6: Review */}
+          {/* Step 6: Sending Config */}
           {step === 5 && (
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <div>
+                  <Label className="mb-1 block">SMTP Configuration</Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Select which SMTP server to use for sending emails. Leave
+                    blank to use the environment default.
+                  </p>
+                </div>
+                {smtpConfigs.length === 0 ? (
+                  <div className="bg-secondary rounded-lg p-4 text-center text-sm text-muted-foreground">
+                    No SMTP configs found.{" "}
+                    <button
+                      type="button"
+                      className="underline text-primary"
+                      onClick={() => navigate("/settings")}
+                    >
+                      Add one in Settings.
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label
+                      onClick={() => set("smtpConfigId")("")}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer",
+                        !form.smtpConfigId
+                          ? "border-primary/40 bg-primary/5"
+                          : "border-border hover:border-primary/20",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "h-4 w-4 rounded-full border flex items-center justify-center shrink-0",
+                          !form.smtpConfigId
+                            ? "bg-primary border-primary"
+                            : "border-border",
+                        )}
+                      >
+                        {!form.smtpConfigId && (
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">
+                          Environment Default
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Use the server-configured SMTP settings
+                        </p>
+                      </div>
+                    </label>
+                    {smtpConfigs.map((cfg) => (
+                      <label
+                        key={cfg._id}
+                        onClick={() => set("smtpConfigId")(cfg._id)}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer",
+                          form.smtpConfigId === cfg._id
+                            ? "border-primary/40 bg-primary/5"
+                            : "border-border hover:border-primary/20",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "h-4 w-4 rounded-full border flex items-center justify-center shrink-0",
+                            form.smtpConfigId === cfg._id
+                              ? "bg-primary border-primary"
+                              : "border-border",
+                          )}
+                        >
+                          {form.smtpConfigId === cfg._id && (
+                            <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                          )}
+                        </div>
+                        <div className="flex-1 pointer-events-none">
+                          <p className="text-sm font-medium">
+                            {cfg.name}
+                            {cfg.isDefault && (
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                (default)
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {cfg.host}:{cfg.port} ·{" "}
+                            {cfg.fromEmail || cfg.username}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <Label className="mb-1 block">Sending Domain</Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Select which domain to use for tracking links in emails.
+                    Leave blank to use the APP_URL default.
+                  </p>
+                </div>
+                {sendingDomains.length === 0 ? (
+                  <div className="bg-secondary rounded-lg p-4 text-center text-sm text-muted-foreground">
+                    No sending domains found.{" "}
+                    <button
+                      type="button"
+                      className="underline text-primary"
+                      onClick={() => navigate("/settings")}
+                    >
+                      Add one in Settings.
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label
+                      onClick={() => set("sendingDomainId")("")}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer",
+                        !form.sendingDomainId
+                          ? "border-primary/40 bg-primary/5"
+                          : "border-border hover:border-primary/20",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "h-4 w-4 rounded-full border flex items-center justify-center shrink-0",
+                          !form.sendingDomainId
+                            ? "bg-primary border-primary"
+                            : "border-border",
+                        )}
+                      >
+                        {!form.sendingDomainId && (
+                          <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">
+                          Environment Default
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Use the APP_URL environment variable
+                        </p>
+                      </div>
+                    </label>
+                    {sendingDomains.map((d) => (
+                      <label
+                        key={d._id}
+                        onClick={() => set("sendingDomainId")(d._id)}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer",
+                          form.sendingDomainId === d._id
+                            ? "border-primary/40 bg-primary/5"
+                            : "border-border hover:border-primary/20",
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "h-4 w-4 rounded-full border flex items-center justify-center shrink-0",
+                            form.sendingDomainId === d._id
+                              ? "bg-primary border-primary"
+                              : "border-border",
+                          )}
+                        >
+                          {form.sendingDomainId === d._id && (
+                            <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                          )}
+                        </div>
+                        <div className="flex-1 pointer-events-none">
+                          <p className="text-sm font-medium">
+                            {d.name}
+                            {d.isDefault && (
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                (default)
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground font-mono">
+                            {d.baseUrl}
+                          </p>
+                        </div>
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded-full pointer-events-none ${d.status === "Active" ? "bg-green-500/10 text-green-400" : "bg-secondary text-muted-foreground"}`}
+                        >
+                          {d.status}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 7: Review */}
+          {step === 6 && (
             <div className="space-y-4">
               <h3 className="font-semibold">Review Campaign</h3>
               <div className="space-y-0 divide-y divide-border text-sm">
@@ -646,6 +877,26 @@ export default function CreateCampaign() {
                     ) : (
                       <span className="text-muted-foreground">
                         Not scheduled
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between py-3">
+                  <span className="text-muted-foreground">SMTP Config</span>
+                  <span className="font-medium">
+                    {selectedSmtpConfig?.name ?? (
+                      <span className="text-muted-foreground">
+                        Environment Default
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between py-3">
+                  <span className="text-muted-foreground">Sending Domain</span>
+                  <span className="font-medium">
+                    {selectedSendingDomain?.name ?? (
+                      <span className="text-muted-foreground">
+                        Environment Default
                       </span>
                     )}
                   </span>

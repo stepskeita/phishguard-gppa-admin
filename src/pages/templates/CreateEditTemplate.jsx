@@ -1,39 +1,104 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Paperclip, X } from "lucide-react";
 import * as commands from "@uiw/react-md-editor/commands";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import PageHeader from "../../components/shared/PageHeader";
 import MDEditor from "@uiw/react-md-editor";
 import api from "@/api/axios";
 
-const defaultBody = `Dear Employee,
-
-We have detected unusual activity on your account. Your password will expire in **24 hours**.
-
-Please click the link below to verify your identity and reset your password:
-
-[Verify Account Now](#)
-
-Thank you,  
-IT Security Team`;
-
 export default function CreateEditTemplate() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const queryClient = useQueryClient();
   const isEdit = Boolean(id);
-  const [body, setBody] = useState(isEdit ? defaultBody : "");
-  const [subject, setSubject] = useState(
-    isEdit ? "Your account requires immediate verification" : "",
-  );
-  const [senderName, setSenderName] = useState(
-    isEdit ? "IT Security Team" : "",
-  );
+
+  const [name, setName] = useState("");
+  const [type, setType] = useState("Login");
+  const [subject, setSubject] = useState("");
+  const [senderName, setSenderName] = useState("");
+  const [body, setBody] = useState("");
   const [attachments, setAttachments] = useState([]);
   const [uploading, setUploading] = useState(false);
+
+  const { data: existing, isLoading: loadingTemplate } = useQuery({
+    queryKey: ["template", id],
+    queryFn: () => api.get(`/templates/${id}`).then((r) => r.data),
+    enabled: isEdit,
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    if (existing) {
+      setName(existing.name ?? "");
+      setType(existing.type ?? "Login");
+      setSubject(existing.subject ?? "");
+      setSenderName(existing.senderName ?? "");
+      setBody(existing.body ?? "");
+      setAttachments(existing.attachments ?? []);
+    }
+  }, [existing]);
+
+  const createMutation = useMutation({
+    mutationFn: (payload) => api.post("/templates", payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      toast.success("Template created");
+      navigate("/templates");
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.error ?? "Failed to create template"),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (payload) => api.put(`/templates/${id}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      queryClient.invalidateQueries({ queryKey: ["template", id] });
+      toast.success("Template saved");
+      navigate("/templates");
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.error ?? "Failed to save template"),
+  });
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
+  const handleSubmit = () => {
+    if (!name.trim()) {
+      toast.error("Template name is required");
+      return;
+    }
+    if (!subject.trim()) {
+      toast.error("Subject line is required");
+      return;
+    }
+    if (!senderName.trim()) {
+      toast.error("Sender name is required");
+      return;
+    }
+    const payload = {
+      name: name.trim(),
+      type,
+      subject: subject.trim(),
+      senderName: senderName.trim(),
+      body,
+      attachments,
+    };
+    isEdit ? updateMutation.mutate(payload) : createMutation.mutate(payload);
+  };
 
   const handleAttachmentUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -79,22 +144,62 @@ export default function CreateEditTemplate() {
         <div className="space-y-5">
           <div className="bg-card border border-border rounded-xl p-6 space-y-5">
             <div className="space-y-2">
-              <Label>Subject Line</Label>
-              <Input
-                placeholder="e.g. Your account requires immediate verification"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                className="bg-secondary border-0"
-              />
+              <Label>
+                Template Name <span className="text-destructive">*</span>
+              </Label>
+              {isEdit && loadingTemplate ? (
+                <Skeleton className="h-9 w-full rounded-lg" />
+              ) : (
+                <Input
+                  placeholder="e.g. Q2 Login Alert"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="bg-secondary border-0"
+                />
+              )}
             </div>
             <div className="space-y-2">
-              <Label>Sender Name</Label>
-              <Input
-                placeholder="e.g. IT Security Team"
-                value={senderName}
-                onChange={(e) => setSenderName(e.target.value)}
-                className="bg-secondary border-0"
-              />
+              <Label>Type</Label>
+              <Select value={type} onValueChange={setType}>
+                <SelectTrigger className="bg-secondary border-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Login">Login</SelectItem>
+                  <SelectItem value="Invoice">Invoice</SelectItem>
+                  <SelectItem value="Alert">Alert</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>
+                Subject Line <span className="text-destructive">*</span>
+              </Label>
+              {isEdit && loadingTemplate ? (
+                <Skeleton className="h-9 w-full rounded-lg" />
+              ) : (
+                <Input
+                  placeholder="e.g. Your account requires immediate verification"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="bg-secondary border-0"
+                />
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>
+                Sender Name <span className="text-destructive">*</span>
+              </Label>
+              {isEdit && loadingTemplate ? (
+                <Skeleton className="h-9 w-full rounded-lg" />
+              ) : (
+                <Input
+                  placeholder="e.g. IT Security Team"
+                  value={senderName}
+                  onChange={(e) => setSenderName(e.target.value)}
+                  className="bg-secondary border-0"
+                />
+              )}
             </div>
             <div className="space-y-2" data-color-mode="dark">
               <Label>Email Body</Label>
@@ -176,15 +281,20 @@ export default function CreateEditTemplate() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button
-              onClick={() => {
-                toast.success(isEdit ? "Template saved" : "Template created");
-                navigate("/templates");
-              }}
-            >
-              {isEdit ? "Save Changes" : "Create Template"}
+            <Button onClick={handleSubmit} disabled={isPending}>
+              {isPending
+                ? isEdit
+                  ? "Saving…"
+                  : "Creating…"
+                : isEdit
+                  ? "Save Changes"
+                  : "Create Template"}
             </Button>
-            <Button variant="outline" onClick={() => navigate("/templates")}>
+            <Button
+              variant="outline"
+              onClick={() => navigate("/templates")}
+              disabled={isPending}
+            >
               Cancel
             </Button>
           </div>
@@ -212,7 +322,13 @@ export default function CreateEditTemplate() {
             </div>
             <hr className="border-border" />
             {body ? (
-              <div data-color-mode="dark">
+              // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+              <div
+                data-color-mode="dark"
+                onClick={(e) => {
+                  if (e.target.closest("a")) e.preventDefault();
+                }}
+              >
                 <MDEditor.Markdown
                   source={body}
                   style={{
