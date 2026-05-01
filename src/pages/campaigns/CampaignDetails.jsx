@@ -8,6 +8,8 @@ import {
   Eye,
   Pencil,
   Rocket,
+  Clock,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -54,6 +56,18 @@ export default function CampaignDetails() {
       toast.error(err.response?.data?.error ?? "Failed to launch campaign"),
   });
 
+  // Revert a Scheduled campaign back to Draft (cancel the schedule)
+  const cancelScheduleMutation = useMutation({
+    mutationFn: () => api.put(`/campaigns/${id}`, { status: "Draft" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["campaign", id] });
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      toast.success("Schedule cancelled — campaign returned to Draft");
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.error ?? "Failed to cancel schedule"),
+  });
+
   const targetUsers = logsData?.data ?? [];
 
   if (loadingCampaign) {
@@ -95,18 +109,56 @@ export default function CampaignDetails() {
             </Button>
             {campaign.status !== "Active" &&
               campaign.status !== "Completed" && (
-                <Button
-                  size="sm"
-                  onClick={() => launchMutation.mutate()}
-                  disabled={launchMutation.isPending}
-                >
-                  <Rocket className="h-3.5 w-3.5 mr-1.5" />
-                  {launchMutation.isPending ? "Launching…" : "Launch"}
-                </Button>
+                <>
+                  {campaign.status === "Scheduled" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => cancelScheduleMutation.mutate()}
+                      disabled={cancelScheduleMutation.isPending}
+                    >
+                      <X className="h-3.5 w-3.5 mr-1.5" />
+                      Cancel Schedule
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    onClick={() => launchMutation.mutate()}
+                    disabled={launchMutation.isPending}
+                  >
+                    <Rocket className="h-3.5 w-3.5 mr-1.5" />
+                    {launchMutation.isPending
+                      ? "Launching…"
+                      : campaign.status === "Scheduled"
+                        ? "Launch Now"
+                        : "Launch"}
+                  </Button>
+                </>
               )}
           </div>
         }
       />
+
+      {/* Scheduled banner */}
+      {campaign.status === "Scheduled" && campaign.startDate && (
+        <div className="mb-6 flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm rounded-xl px-4 py-3">
+          <Clock className="h-4 w-4 shrink-0" />
+          <span>
+            Scheduled to send on{" "}
+            <strong>
+              {new Date(campaign.startDate).toLocaleString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </strong>{" "}
+            {campaign.timezone ?? "UTC"} — the server will launch it
+            automatically.
+          </span>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -166,6 +218,32 @@ export default function CampaignDetails() {
                       year: "numeric",
                     })
                   : "—"}
+              </span>
+            </div>
+            {campaign.launchedAt && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Launched At</span>
+                <span>
+                  {new Date(campaign.launchedAt).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">SMTP Config</span>
+              <span>
+                {campaign.smtpConfigId?.name ?? "Environment Default"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Sending Domain</span>
+              <span>
+                {campaign.sendingDomainId?.name ?? "Environment Default"}
               </span>
             </div>
             {campaign.description && (

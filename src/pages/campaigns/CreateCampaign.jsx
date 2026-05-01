@@ -187,7 +187,12 @@ export default function CreateCampaign() {
       smtpConfigId: form.smtpConfigId || undefined,
       sendingDomainId: form.sendingDomainId || undefined,
       timezone: form.timezone,
-      status: form.status,
+      // Auto-set status to Scheduled when a future startDate is provided
+      status: form.startDate
+        ? "Scheduled"
+        : form.status === "Scheduled"
+          ? "Draft"
+          : form.status,
     };
     if (form.startDate) {
       const dt = form.startTime
@@ -839,7 +844,9 @@ export default function CreateCampaign() {
                 </div>
                 <div className="flex justify-between py-3">
                   <span className="text-muted-foreground">Status</span>
-                  <StatusBadge status={form.status} />
+                  <StatusBadge
+                    status={form.startDate ? "Scheduled" : form.status}
+                  />
                 </div>
                 <div className="flex justify-between py-3">
                   <span className="text-muted-foreground">Target Groups</span>
@@ -929,7 +936,9 @@ export default function CreateCampaign() {
                     : "Creating…"
                   : isEdit
                     ? "Save Campaign"
-                    : "Create Campaign"}
+                    : form.startDate
+                      ? "Schedule Campaign"
+                      : "Create Campaign"}
               </Button>
             )}
           </div>

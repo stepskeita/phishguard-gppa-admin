@@ -193,12 +193,17 @@ export default function CreateEditLandingPage() {
           </div>
           <div className="space-y-2">
             <Label>Sending Domain</Label>
-            <Select value={sendingDomainId} onValueChange={setSendingDomainId}>
+            <Select
+              value={sendingDomainId || "__none__"}
+              onValueChange={(v) =>
+                setSendingDomainId(v === "__none__" ? "" : v)
+              }
+            >
               <SelectTrigger className="bg-secondary border-0">
                 <SelectValue placeholder="Environment Default" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Environment Default</SelectItem>
+                <SelectItem value="__none__">Environment Default</SelectItem>
                 {sendingDomains.map((d) => (
                   <SelectItem key={d._id} value={d._id}>
                     {d.name}
