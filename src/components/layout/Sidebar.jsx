@@ -3,9 +3,10 @@ import { useState } from "react";
 import {
   LayoutDashboard, Users, UsersRound, Target, Mail, Globe,
   Link2, BarChart3, GraduationCap, Shield, UserCog, ScrollText,
-  Settings, ChevronLeft, ChevronRight, ShieldAlert
+  Settings, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import logo from "@/assets/logo.png";
 
 const menuItems = [
   { label: "Dashboard", icon: LayoutDashboard, path: "/" },
@@ -37,11 +38,13 @@ export default function Sidebar({ collapsed, onToggle }) {
       collapsed ? "w-16" : "w-60"
     )}>
       {/* Logo */}
-      <div className="h-16 flex items-center px-4 border-b border-sidebar-border shrink-0">
-        <ShieldAlert className="h-7 w-7 text-primary shrink-0" />
+      <div className="h-16 flex items-center justify-center px-3 border-b border-sidebar-border shrink-0">
+        <div className={cn("bg-white rounded-xl overflow-hidden flex items-center justify-center shrink-0", collapsed ? "h-9 w-9 p-0.5" : "h-10 w-10 p-0.5")}>
+          <img src={logo} alt="Jambarr360" className="h-full w-full object-contain" />
+        </div>
         {!collapsed && (
-          <span className="ml-3 text-lg font-bold text-foreground tracking-tight">
-            PhishGuard
+          <span className="ml-2.5 text-base font-bold text-foreground tracking-tight truncate">
+            Jambarr360
           </span>
         )}
       </div>

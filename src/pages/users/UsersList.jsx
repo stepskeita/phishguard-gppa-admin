@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import PageHeader from "../../components/shared/PageHeader";
 import DataTable from "../../components/shared/DataTable";
@@ -12,7 +13,14 @@ import api from "@/api/axios";
 export default function UsersList() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const [deleteTarget, setDeleteTarget] = useState(
+    /** @type {{ id: string; name: string } | null} */ (null),
+  );
+  const [bulkDeleteIds, setBulkDeleteIds] = useState(/** @type {string[]} */ ([]));
+
+  /** @type {React.MutableRefObject<(() => void) | null>} */
+  const bulkClearRef = useRef(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["users"],
@@ -22,11 +30,24 @@ export default function UsersList() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => api.delete(`/users/${id}`),
+    mutationFn: (/** @type {string} */ id) => api.delete(`/users/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       setDeleteTarget(null);
     },
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (/** @type {string[]} */ ids) =>
+      Promise.all(ids.map((id) => api.delete(`/users/${id}`))),
+    onSuccess: (_data, ids) => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      bulkClearRef.current?.();
+      bulkClearRef.current = null;
+      setBulkDeleteIds([]);
+      toast.success(`${ids.length} user${ids.length !== 1 ? "s" : ""} deleted`);
+    },
+    onError: () => toast.error("Some users could not be deleted"),
   });
 
   const users = data?.data ?? [];
@@ -90,16 +111,31 @@ export default function UsersList() {
 
   return (
     <div>
+      {/* Single-user delete */}
       <DeleteDialog
         open={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="Delete User"
         description={`Are you sure you want to delete "${deleteTarget?.name}"? This action cannot be undone.`}
-        onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
         isLoading={deleteMutation.isPending}
       />
+
+      {/* Bulk delete */}
+      <DeleteDialog
+        open={bulkDeleteIds.length > 0}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBulkDeleteIds([]);
+            bulkClearRef.current = null;
+          }
+        }}
+        title={`Delete ${bulkDeleteIds.length} Users`}
+        description={`Are you sure you want to delete ${bulkDeleteIds.length} user${bulkDeleteIds.length !== 1 ? "s" : ""}? This action cannot be undone.`}
+        onConfirm={() => bulkDeleteMutation.mutate(bulkDeleteIds)}
+        isLoading={bulkDeleteMutation.isPending}
+      />
+
       <PageHeader
         title="Users"
         description="Manage users in your phishing simulation program"
@@ -119,6 +155,7 @@ export default function UsersList() {
           </>
         }
       />
+
       <DataTable
         columns={columns}
         data={users}
@@ -127,6 +164,20 @@ export default function UsersList() {
         selectable
         searchPlaceholder="Search users..."
         onRowClick={(row) => navigate(`/users/${row._id}`)}
+        bulkActions={(selectedIds, clearSelection) => (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              bulkClearRef.current = clearSelection;
+              setBulkDeleteIds(selectedIds);
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete {selectedIds.length}
+          </Button>
+        )}
       />
     </div>
   );

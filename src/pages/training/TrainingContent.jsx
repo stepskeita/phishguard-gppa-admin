@@ -126,6 +126,27 @@ export default function TrainingContent() {
       ),
     },
     {
+      header: "Attempts",
+      accessor: "maxAttempts",
+      render: (row) => (
+        <span className="text-muted-foreground">{row.maxAttempts ?? 3}</span>
+      ),
+    },
+    {
+      header: "Time Limit",
+      accessor: "timeLimitMinutes",
+      render: (row) => (
+        <span className="text-muted-foreground">{row.timeLimitMinutes ?? 30} min</span>
+      ),
+    },
+    {
+      header: "Pass %",
+      accessor: "passPercentage",
+      render: (row) => (
+        <span className="text-muted-foreground">{row.passPercentage ?? 75}%</span>
+      ),
+    },
+    {
       header: "Actions",
       render: (row) => (
         <div

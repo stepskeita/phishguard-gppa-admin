@@ -4,7 +4,9 @@ import api from "@/api/axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ShieldAlert, Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
+import logo from "@/assets/logo.png";
+import ThemeToggle from "@/components/shared/ThemeToggle";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -32,13 +34,13 @@ export default function ForgotPassword() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="relative min-h-screen flex items-center justify-center bg-background p-4">
+        <ThemeToggle className="absolute top-4 right-4" />
         <div className="w-full max-w-sm space-y-6">
-          <div className="flex flex-col items-center gap-2 text-center">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <ShieldAlert className="h-6 w-6 text-primary" />
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="h-20 w-20 rounded-2xl bg-white p-2 shadow-sm">
+              <img src={logo} alt="Jambarr360" className="h-full w-full object-contain" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">PhishGuard</h1>
           </div>
 
           <div className="bg-card border border-border rounded-xl p-6 space-y-3 text-center">
@@ -77,11 +79,10 @@ export default function ForgotPassword() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6">
-        <div className="flex flex-col items-center gap-2 text-center">
-          <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-            <ShieldAlert className="h-6 w-6 text-primary" />
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="h-20 w-20 rounded-2xl bg-white p-2 shadow-sm">
+            <img src={logo} alt="Jambarr360" className="h-full w-full object-contain" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">PhishGuard</h1>
           <p className="text-sm text-muted-foreground">Admin Portal</p>
         </div>
 

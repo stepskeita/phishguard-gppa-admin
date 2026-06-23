@@ -38,6 +38,8 @@ const INITIAL = {
   landingPageId: "",
   startDate: "",
   startTime: "",
+  endDate: "",
+  endTime: "",
   timezone: "UTC",
   status: "Draft",
   smtpConfigId: "",
@@ -103,6 +105,9 @@ export default function CreateCampaign() {
       const startDt = existingCampaign.startDate
         ? new Date(existingCampaign.startDate)
         : null;
+      const endDt = existingCampaign.endDate
+        ? new Date(existingCampaign.endDate)
+        : null;
       setForm({
         name: existingCampaign.name ?? "",
         description: existingCampaign.description ?? "",
@@ -126,7 +131,9 @@ export default function CreateCampaign() {
           existingCampaign.sendingDomainId ??
           "",
         startDate: startDt ? startDt.toISOString().split("T")[0] : "",
-        startTime: startDt ? startDt.toTimeString().slice(0, 5) : "",
+        startTime: startDt ? startDt.toISOString().slice(11, 16) : "",
+        endDate: endDt ? endDt.toISOString().split("T")[0] : "",
+        endTime: endDt ? endDt.toISOString().slice(11, 16) : "",
         timezone: existingCampaign.timezone ?? "UTC",
         status: existingCampaign.status ?? "Draft",
       });
@@ -177,6 +184,21 @@ export default function CreateCampaign() {
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
   const prev = () => setStep((s) => Math.max(s - 1, 0));
 
+  const buildDateTime = (date, time) => {
+    if (!date) return null;
+    // Interpret the local date+time as UTC (consistent with the timezone label)
+    const iso = time ? `${date}T${time}:00Z` : `${date}T00:00:00Z`;
+    return new Date(iso).toISOString();
+  };
+
+  const scheduleError = useMemo(() => {
+    if (!form.startDate || !form.endDate) return null;
+    const start = new Date(buildDateTime(form.startDate, form.startTime));
+    const end = new Date(buildDateTime(form.endDate, form.endTime));
+    if (end <= start) return "End date/time must be after start date/time.";
+    return null;
+  }, [form.startDate, form.startTime, form.endDate, form.endTime]);
+
   const buildPayload = () => {
     const payload = {
       name: form.name.trim(),
@@ -187,6 +209,7 @@ export default function CreateCampaign() {
       smtpConfigId: form.smtpConfigId || undefined,
       sendingDomainId: form.sendingDomainId || undefined,
       timezone: form.timezone,
+      endDate: form.endDate ? buildDateTime(form.endDate, form.endTime) : null,
       // Auto-set status to Scheduled when a future startDate is provided
       status: form.startDate
         ? "Scheduled"
@@ -195,10 +218,7 @@ export default function CreateCampaign() {
           : form.status,
     };
     if (form.startDate) {
-      const dt = form.startTime
-        ? new Date(`${form.startDate}T${form.startTime}`)
-        : new Date(form.startDate);
-      payload.startDate = dt.toISOString();
+      payload.startDate = buildDateTime(form.startDate, form.startTime);
     }
     return payload;
   };
@@ -206,6 +226,10 @@ export default function CreateCampaign() {
   const handleSubmit = () => {
     if (!form.name.trim()) {
       toast.error("Campaign name is required");
+      return;
+    }
+    if (scheduleError) {
+      toast.error(scheduleError);
       return;
     }
     const payload = buildPayload();
@@ -585,32 +609,7 @@ export default function CreateCampaign() {
           {/* Step 5: Schedule */}
           {step === 4 && (
             <div className="space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <Label htmlFor="start-date">Start Date</Label>
-                  <label htmlFor="start-date" className="block cursor-pointer">
-                    <Input
-                      id="start-date"
-                      type="date"
-                      className="bg-secondary border-0 cursor-pointer text-foreground [color-scheme:dark] w-full"
-                      value={form.startDate}
-                      onChange={set("startDate")}
-                    />
-                  </label>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="start-time">Start Time</Label>
-                  <label htmlFor="start-time" className="block cursor-pointer">
-                    <Input
-                      id="start-time"
-                      type="time"
-                      className="bg-secondary border-0 cursor-pointer text-foreground [color-scheme:dark] w-full"
-                      value={form.startTime}
-                      onChange={set("startTime")}
-                    />
-                  </label>
-                </div>
-              </div>
+              {/* Timezone — top so both date rows share context */}
               <div className="space-y-2">
                 <Label>Timezone</Label>
                 <Select value={form.timezone} onValueChange={set("timezone")}>
@@ -618,17 +617,100 @@ export default function CreateCampaign() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="UTC">UTC</SelectItem>
-                    <SelectItem value="America/New_York">
-                      EST (UTC-5)
-                    </SelectItem>
-                    <SelectItem value="America/Los_Angeles">
-                      PST (UTC-8)
-                    </SelectItem>
-                    <SelectItem value="Europe/Paris">CET (UTC+1)</SelectItem>
+                    <SelectItem value="UTC">UTC (Coordinated Universal Time)</SelectItem>
+                    <SelectItem value="America/New_York">America/New_York (EST UTC−5)</SelectItem>
+                    <SelectItem value="America/Chicago">America/Chicago (CST UTC−6)</SelectItem>
+                    <SelectItem value="America/Denver">America/Denver (MST UTC−7)</SelectItem>
+                    <SelectItem value="America/Los_Angeles">America/Los_Angeles (PST UTC−8)</SelectItem>
+                    <SelectItem value="Europe/London">Europe/London (GMT UTC+0)</SelectItem>
+                    <SelectItem value="Europe/Paris">Europe/Paris (CET UTC+1)</SelectItem>
+                    <SelectItem value="Europe/Berlin">Europe/Berlin (CET UTC+1)</SelectItem>
+                    <SelectItem value="Asia/Dubai">Asia/Dubai (GST UTC+4)</SelectItem>
+                    <SelectItem value="Asia/Kolkata">Asia/Kolkata (IST UTC+5:30)</SelectItem>
+                    <SelectItem value="Asia/Singapore">Asia/Singapore (SGT UTC+8)</SelectItem>
+                    <SelectItem value="Asia/Tokyo">Asia/Tokyo (JST UTC+9)</SelectItem>
+                    <SelectItem value="Australia/Sydney">Australia/Sydney (AEDT UTC+11)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Start row */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Start</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div
+                    className="space-y-1.5 cursor-pointer"
+                    onClick={() => document.getElementById("start-date").showPicker?.()}
+                  >
+                    <Label htmlFor="start-date" className="cursor-pointer">Date</Label>
+                    <Input
+                      id="start-date"
+                      type="date"
+                      className="bg-secondary border-0 cursor-pointer text-foreground [color-scheme:light] dark:[color-scheme:dark] w-full"
+                      value={form.startDate}
+                      onChange={set("startDate")}
+                    />
+                  </div>
+                  <div
+                    className="space-y-1.5 cursor-pointer"
+                    onClick={() => document.getElementById("start-time").showPicker?.()}
+                  >
+                    <Label htmlFor="start-time" className="cursor-pointer">Time ({form.timezone})</Label>
+                    <Input
+                      id="start-time"
+                      type="time"
+                      className="bg-secondary border-0 cursor-pointer text-foreground [color-scheme:light] dark:[color-scheme:dark] w-full"
+                      value={form.startTime}
+                      onChange={set("startTime")}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* End row */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">End</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div
+                    className="space-y-1.5 cursor-pointer"
+                    onClick={() => document.getElementById("end-date").showPicker?.()}
+                  >
+                    <Label htmlFor="end-date" className="cursor-pointer">Date</Label>
+                    <Input
+                      id="end-date"
+                      type="date"
+                      className="bg-secondary border-0 cursor-pointer text-foreground [color-scheme:light] dark:[color-scheme:dark] w-full"
+                      value={form.endDate}
+                      onChange={set("endDate")}
+                      min={form.startDate || undefined}
+                    />
+                  </div>
+                  <div
+                    className="space-y-1.5 cursor-pointer"
+                    onClick={() => document.getElementById("end-time").showPicker?.()}
+                  >
+                    <Label htmlFor="end-time" className="cursor-pointer">Time ({form.timezone})</Label>
+                    <Input
+                      id="end-time"
+                      type="time"
+                      className="bg-secondary border-0 cursor-pointer text-foreground [color-scheme:light] dark:[color-scheme:dark] w-full"
+                      value={form.endTime}
+                      onChange={set("endTime")}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Inline validation error */}
+              {scheduleError && (
+                <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-2.5 text-sm text-destructive">
+                  {scheduleError}
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                All times are interpreted as {form.timezone}. Leave end date blank for an open-ended campaign.
+              </p>
             </div>
           )}
 
@@ -876,18 +958,29 @@ export default function CreateCampaign() {
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between py-3">
-                  <span className="text-muted-foreground">Schedule</span>
-                  <span className="font-medium">
+                <div className="flex justify-between py-3 gap-4">
+                  <span className="text-muted-foreground shrink-0">Start</span>
+                  <span className="font-medium text-right">
                     {form.startDate ? (
-                      `${form.startDate}${form.startTime ? ` at ${form.startTime}` : ""} ${form.timezone}`
+                      `${form.startDate}${form.startTime ? ` ${form.startTime}` : ""} ${form.timezone}`
                     ) : (
-                      <span className="text-muted-foreground">
-                        Not scheduled
-                      </span>
+                      <span className="text-muted-foreground">Not set</span>
                     )}
                   </span>
                 </div>
+                <div className="flex justify-between py-3 gap-4">
+                  <span className="text-muted-foreground shrink-0">End</span>
+                  <span className="font-medium text-right">
+                    {form.endDate ? (
+                      `${form.endDate}${form.endTime ? ` ${form.endTime}` : ""} ${form.timezone}`
+                    ) : (
+                      <span className="text-muted-foreground">Open-ended</span>
+                    )}
+                  </span>
+                </div>
+                {scheduleError && (
+                  <div className="py-2 text-sm text-destructive">{scheduleError}</div>
+                )}
                 <div className="flex justify-between py-3">
                   <span className="text-muted-foreground">SMTP Config</span>
                   <span className="font-medium">

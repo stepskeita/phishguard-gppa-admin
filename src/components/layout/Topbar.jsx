@@ -1,5 +1,6 @@
 import { Search, Bell, ChevronDown, Menu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import ThemeToggle from "@/components/shared/ThemeToggle";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -39,6 +40,9 @@ export default function Topbar({ onMobileMenuToggle }) {
 
       {/* Right */}
       <div className="flex items-center gap-2">
+        {/* Theme toggle */}
+        <ThemeToggle />
+
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

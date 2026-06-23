@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Slider } from "@/components/ui/slider";
 import PageHeader from "../../components/shared/PageHeader";
 import api from "@/api/axios";
 
@@ -19,6 +20,9 @@ export default function QuizManagement() {
 
   const [quizTitle, setQuizTitle] = useState("");
   const [questions, setQuestions] = useState([]);
+  const [maxAttempts, setMaxAttempts] = useState(3);
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState(30);
+  const [passPercentage, setPassPercentage] = useState(75);
 
   const { data: existing, isLoading: loadingQuiz } = useQuery({
     queryKey: ["quiz", id],
@@ -30,6 +34,9 @@ export default function QuizManagement() {
   useEffect(() => {
     if (existing) {
       setQuizTitle(existing.title ?? "");
+      setMaxAttempts(existing.maxAttempts ?? 3);
+      setTimeLimitMinutes(existing.timeLimitMinutes ?? 30);
+      setPassPercentage(existing.passPercentage ?? 75);
       setQuestions(
         (existing.questions ?? []).map((q) => ({
           id: q._id ?? Date.now(),
@@ -87,6 +94,9 @@ export default function QuizManagement() {
     }
     const payload = {
       title: quizTitle.trim(),
+      maxAttempts,
+      timeLimitMinutes,
+      passPercentage,
       questions: questions.map(({ text, options, correct }) => ({
         text,
         options,
@@ -131,6 +141,7 @@ export default function QuizManagement() {
       />
 
       <div className="max-w-2xl space-y-5">
+        {/* Title */}
         <div className="bg-card border border-border rounded-xl p-6">
           <div className="space-y-2">
             <Label>
@@ -146,6 +157,74 @@ export default function QuizManagement() {
                 placeholder="e.g. Phishing Basics Quiz"
               />
             )}
+          </div>
+        </div>
+
+        {/* Quiz Configuration */}
+        <div className="bg-card border border-border rounded-xl p-6 space-y-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Settings2 className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Quiz Configuration</h3>
+          </div>
+
+          {/* Max Attempts */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Number of Attempts</Label>
+              <span className="text-sm font-semibold text-primary w-8 text-right">{maxAttempts}</span>
+            </div>
+            <Slider
+              min={1}
+              max={10}
+              step={1}
+              value={[maxAttempts]}
+              onValueChange={([v]) => setMaxAttempts(v)}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>1 attempt</span>
+              <span>10 attempts</span>
+            </div>
+          </div>
+
+          {/* Time Limit */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Assignment Time</Label>
+              <span className="text-sm font-semibold text-primary">{timeLimitMinutes} min</span>
+            </div>
+            <Slider
+              min={5}
+              max={180}
+              step={5}
+              value={[timeLimitMinutes]}
+              onValueChange={([v]) => setTimeLimitMinutes(v)}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>5 min</span>
+              <span>180 min</span>
+            </div>
+          </div>
+
+          {/* Pass Percentage */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Pass Percentage</Label>
+              <span className="text-sm font-semibold text-primary">{passPercentage}%</span>
+            </div>
+            <Slider
+              min={0}
+              max={100}
+              step={5}
+              value={[passPercentage]}
+              onValueChange={([v]) => setPassPercentage(v)}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>0%</span>
+              <span>100%</span>
+            </div>
           </div>
         </div>
 

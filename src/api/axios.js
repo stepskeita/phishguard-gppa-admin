@@ -9,13 +9,16 @@ const api = axios.create(API_CONFIG);
 api.interceptors.request.use((config) => {
   try {
     const token = JSON.parse(localStorage.getItem(TOKEN_KEY));
-
-    console.log("Token:", token);
     if (token) config.headers.Authorization = `Bearer ${token}`;
-  } catch (error) {
-    console.log(error);
+  } catch {
     // Corrupt localStorage — proceed unauthenticated.
   }
+
+  // Let axios set Content-Type automatically for multipart uploads
+  if (config.data instanceof FormData) {
+    delete config.headers["Content-Type"];
+  }
+
   return config;
 });
 

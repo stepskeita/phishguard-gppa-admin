@@ -6,6 +6,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/**
+ * @param {{
+ *   columns: any[],
+ *   data: any[],
+ *   isLoading?: boolean,
+ *   searchable?: boolean,
+ *   searchPlaceholder?: string,
+ *   selectable?: boolean,
+ *   pageSize?: number,
+ *   onRowClick?: (row: any) => void,
+ *   emptyMessage?: string,
+ *   bulkActions?: ((selectedIds: string[], clearSelection: () => void) => import("react").ReactNode) | null,
+ * }} props
+ */
 export default function DataTable({
   columns,
   data,
@@ -16,6 +30,7 @@ export default function DataTable({
   pageSize = 10,
   onRowClick,
   emptyMessage = "No data found",
+  bulkActions = null,
 }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -34,13 +49,13 @@ export default function DataTable({
   const paginated = filtered.slice(page * pageSize, (page + 1) * pageSize);
 
   const allSelected =
-    paginated.length > 0 && paginated.every((r) => selected.includes(r.id));
+    paginated.length > 0 && paginated.every((r) => selected.includes(r._id));
 
   const toggleAll = () => {
     if (allSelected) {
-      setSelected(selected.filter((id) => !paginated.find((r) => r.id === id)));
+      setSelected(selected.filter((id) => !paginated.find((r) => r._id === id)));
     } else {
-      setSelected([...new Set([...selected, ...paginated.map((r) => r.id)])]);
+      setSelected([...new Set([...selected, ...paginated.map((r) => r._id)])]);
     }
   };
 
@@ -50,11 +65,13 @@ export default function DataTable({
     );
   };
 
+  const clearSelection = () => setSelected([]);
+
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
       {searchable && (
-        <div className="p-4 border-b border-border">
-          <div className="relative max-w-xs">
+        <div className="p-4 border-b border-border flex items-center gap-3">
+          <div className="relative max-w-xs flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={search}
@@ -66,6 +83,14 @@ export default function DataTable({
               className="pl-9 bg-secondary border-0 text-sm"
             />
           </div>
+          {selectable && selected.length > 0 && (
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs text-muted-foreground">
+                {selected.length} selected
+              </span>
+              {bulkActions?.(selected, clearSelection)}
+            </div>
+          )}
         </div>
       )}
 
@@ -121,7 +146,7 @@ export default function DataTable({
             ) : (
               paginated.map((row, i) => (
                 <tr
-                  key={row.id || i}
+                  key={row._id || i}
                   className={cn(
                     "border-b border-border/50 last:border-0 transition-colors",
                     onRowClick && "cursor-pointer hover:bg-secondary/50",
@@ -134,8 +159,8 @@ export default function DataTable({
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Checkbox
-                        checked={selected.includes(row.id)}
-                        onCheckedChange={() => toggleRow(row.id)}
+                        checked={selected.includes(row._id)}
+                        onCheckedChange={() => toggleRow(row._id)}
                       />
                     </td>
                   )}

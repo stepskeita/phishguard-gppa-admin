@@ -1,4 +1,13 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import PageHeader from "../components/shared/PageHeader";
 import DataTable from "../components/shared/DataTable";
 import api from "@/api/axios";
@@ -41,14 +50,14 @@ const columns = [
     header: "Timestamp",
     accessor: "timestamp",
     render: (row) => (
-      <span className="text-muted-foreground">
-        {formatTimestamp(row.timestamp)}
-      </span>
+      <span className="text-muted-foreground">{formatTimestamp(row.timestamp)}</span>
     ),
   },
 ];
 
 export default function AuditLogs() {
+  const [exporting, setExporting] = useState(false);
+
   const { data, isLoading } = useQuery({
     queryKey: ["audit-logs"],
     queryFn: () =>
@@ -57,6 +66,29 @@ export default function AuditLogs() {
   });
 
   const logs = data?.data ?? [];
+
+  async function handleExport(/** @type {"csv" | "xlsx"} */ format) {
+    setExporting(true);
+    try {
+      const res = await api.get("/audit-logs/export", {
+        params: { format },
+        responseType: "blob",
+      });
+
+      const mime = format === "xlsx"
+        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        : "text/csv";
+      const blob = new Blob([res.data], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div>
@@ -67,6 +99,32 @@ export default function AuditLogs() {
           { label: "Dashboard", href: "/" },
           { label: "Audit Logs" },
         ]}
+        actions={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2" disabled={exporting}>
+                <Download className="h-4 w-4" />
+                {exporting ? "Exporting…" : "Export"}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer"
+                onClick={() => handleExport("csv")}
+              >
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2 cursor-pointer"
+                onClick={() => handleExport("xlsx")}
+              >
+                <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
+                Export as Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
       />
       <DataTable
         columns={columns}
