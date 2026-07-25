@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PageHeader from "../../components/shared/PageHeader";
 import StatusBadge from "../../components/shared/StatusBadge";
+import TrainingStatusBadge from "../../components/shared/TrainingStatusBadge";
 import api from "@/api/axios";
 
 export default function UserProfile() {
@@ -155,6 +156,9 @@ export default function UserProfile() {
                       Title
                     </th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
+                      Campaign
+                    </th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
                       Status
                     </th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
@@ -174,8 +178,24 @@ export default function UserProfile() {
                       <td className="px-5 py-3 text-sm font-medium">
                         {t.trainingContentId?.title ?? "—"}
                       </td>
+                      <td className="px-5 py-3 text-sm text-muted-foreground">
+                        {t.campaignId?.name ?? "Manual"}
+                      </td>
                       <td className="px-5 py-3">
-                        <StatusBadge status={t.status} />
+                        <TrainingStatusBadge
+                          showTitle={false}
+                          invalidateKeys={[["training-records-user", id]]}
+                          record={{
+                            _id: t._id,
+                            status: t.status,
+                            attemptsUsed: t.attempts?.length ?? 0,
+                            effectiveMaxAttempts:
+                              t.maxAttemptsOverride ??
+                              t.quizId?.maxAttempts ??
+                              null,
+                            locked: t.status === "Failed",
+                          }}
+                        />
                       </td>
                       <td className="px-5 py-3 text-sm">
                         {t.score != null ? `${t.score}%` : "—"}

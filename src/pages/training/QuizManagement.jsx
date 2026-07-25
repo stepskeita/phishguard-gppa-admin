@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Settings2 } from "lucide-react";
+import { Plus, Trash2, Settings2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -91,6 +91,10 @@ export default function QuizManagement() {
         toast.error("All options must be filled in");
         return;
       }
+      if (q.options.length < 2 || q.options.length > 6) {
+        toast.error("Each question must have between 2 and 6 options");
+        return;
+      }
     }
     const payload = {
       title: quizTitle.trim(),
@@ -127,6 +131,25 @@ export default function QuizManagement() {
   const setCorrect = (qId, oi) =>
     setQuestions(
       questions.map((q) => (q.id === qId ? { ...q, correct: oi } : q)),
+    );
+  const addOption = (qId) =>
+    setQuestions(
+      questions.map((q) =>
+        q.id === qId && q.options.length < 6
+          ? { ...q, options: [...q.options, ""] }
+          : q,
+      ),
+    );
+  const removeOption = (qId, oi) =>
+    setQuestions(
+      questions.map((q) => {
+        if (q.id !== qId || q.options.length <= 2) return q;
+        const options = q.options.filter((_, i) => i !== oi);
+        let correct = q.correct;
+        if (oi === q.correct) correct = 0;
+        else if (oi < q.correct) correct = q.correct - 1;
+        return { ...q, options, correct };
+      }),
     );
 
   return (
@@ -280,9 +303,31 @@ export default function QuizManagement() {
                       placeholder={`Option ${oi + 1}`}
                       className="bg-transparent border-0 p-0 h-auto focus-visible:ring-0"
                     />
+                    {q.options.length > 2 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          removeOption(q.id, oi);
+                        }}
+                        className="text-muted-foreground hover:text-destructive shrink-0"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </label>
                 ))}
               </RadioGroup>
+              {q.options.length < 6 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => addOption(q.id)}
+                  className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Option
+                </Button>
+              )}
             </div>
           ))
         )}

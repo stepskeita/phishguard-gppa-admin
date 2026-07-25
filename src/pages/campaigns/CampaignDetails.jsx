@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import PageHeader from "../../components/shared/PageHeader";
 import StatusBadge from "../../components/shared/StatusBadge";
 import KpiCard from "../../components/shared/KpiCard";
+import TrainingStatusBadge from "../../components/shared/TrainingStatusBadge";
 import { cn } from "@/lib/utils";
 import api from "@/api/axios";
 
@@ -36,12 +37,10 @@ export default function CampaignDetails() {
     enabled: !!id,
   });
 
-  const { data: logsData } = useQuery({
-    queryKey: ["tracking-logs", id],
+  const { data: activityData } = useQuery({
+    queryKey: ["campaign-user-activity", id],
     queryFn: () =>
-      api
-        .get("/tracking-logs", { params: { campaignId: id, limit: 20 } })
-        .then((r) => r.data),
+      api.get(`/campaigns/${id}/user-activity`).then((r) => r.data),
     enabled: !!id,
   });
 
@@ -68,7 +67,7 @@ export default function CampaignDetails() {
       toast.error(err.response?.data?.error ?? "Failed to cancel schedule"),
   });
 
-  const targetUsers = logsData?.data ?? [];
+  const targetUsers = activityData?.data ?? [];
 
   if (loadingCampaign) {
     return (
@@ -276,6 +275,9 @@ export default function CampaignDetails() {
                   <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
                     Action
                   </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
+                    Training Status
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -295,6 +297,21 @@ export default function CampaignDetails() {
                     </td>
                     <td className="px-5 py-3">
                       <StatusBadge status={log.action} />
+                    </td>
+                    <td className="px-5 py-3">
+                      {log.trainingRecords?.length > 0 ? (
+                        <div className="flex flex-col gap-1.5">
+                          {log.trainingRecords.map((record) => (
+                            <TrainingStatusBadge
+                              key={record._id}
+                              record={record}
+                              invalidateKeys={[["campaign-user-activity", id]]}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </td>
                   </tr>
                 ))}

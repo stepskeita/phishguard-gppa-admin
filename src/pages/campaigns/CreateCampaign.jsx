@@ -25,6 +25,7 @@ const STEPS = [
   "Targeting",
   "Email Template",
   "Landing Page",
+  "Remediation Training",
   "Schedule",
   "Sending Config",
   "Review",
@@ -36,6 +37,7 @@ const INITIAL = {
   targetGroupIds: [],
   emailTemplateId: "",
   landingPageId: "",
+  remediationTrainingIds: [],
   startDate: "",
   startTime: "",
   endDate: "",
@@ -80,6 +82,14 @@ export default function CreateCampaign() {
   });
   const landingPages = landingPagesRes?.data ?? [];
 
+  const { data: trainingRes, isLoading: trainingLoading } = useQuery({
+    queryKey: ["training"],
+    queryFn: () =>
+      api.get("/training", { params: { limit: 100 } }).then((r) => r.data),
+    staleTime: 60_000,
+  });
+  const trainingContent = trainingRes?.data ?? [];
+
   const { data: smtpConfigs = [] } = useQuery({
     queryKey: ["smtp-configs"],
     queryFn: () => api.get("/smtp-configs").then((r) => r.data),
@@ -122,6 +132,9 @@ export default function CreateCampaign() {
           existingCampaign.landingPageId?._id ??
           existingCampaign.landingPageId ??
           "",
+        remediationTrainingIds: (
+          existingCampaign.remediationTrainingIds ?? []
+        ).map((t) => t._id ?? t),
         smtpConfigId:
           existingCampaign.smtpConfigId?._id ??
           existingCampaign.smtpConfigId ??
@@ -181,6 +194,14 @@ export default function CreateCampaign() {
         : [...prev.targetGroupIds, groupId],
     }));
 
+  const toggleTraining = (contentId) =>
+    setForm((prev) => ({
+      ...prev,
+      remediationTrainingIds: prev.remediationTrainingIds.includes(contentId)
+        ? prev.remediationTrainingIds.filter((t) => t !== contentId)
+        : [...prev.remediationTrainingIds, contentId],
+    }));
+
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
   const prev = () => setStep((s) => Math.max(s - 1, 0));
 
@@ -206,6 +227,7 @@ export default function CreateCampaign() {
       targetGroupIds: form.targetGroupIds,
       emailTemplateId: form.emailTemplateId || undefined,
       landingPageId: form.landingPageId || undefined,
+      remediationTrainingIds: form.remediationTrainingIds,
       smtpConfigId: form.smtpConfigId || undefined,
       sendingDomainId: form.sendingDomainId || undefined,
       timezone: form.timezone,
@@ -248,6 +270,13 @@ export default function CreateCampaign() {
   const selectedGroups = useMemo(
     () => groups.filter((g) => form.targetGroupIds.includes(g._id)),
     [groups, form.targetGroupIds],
+  );
+  const selectedTrainings = useMemo(
+    () =>
+      trainingContent.filter((t) =>
+        form.remediationTrainingIds.includes(t._id),
+      ),
+    [trainingContent, form.remediationTrainingIds],
   );
 
   const selectedSmtpConfig = useMemo(
@@ -606,8 +635,90 @@ export default function CreateCampaign() {
             </div>
           )}
 
-          {/* Step 5: Schedule */}
+          {/* Step 5: Remediation Training */}
           {step === 4 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between mb-1">
+                <Label>Assign Training to Victims (optional)</Label>
+                {form.remediationTrainingIds.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {form.remediationTrainingIds.length} selected
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground -mt-1">
+                Anyone who clicks the phishing link in this campaign is
+                automatically enrolled in the selected training and emailed
+                portal access. Leave empty for no automatic follow-up.
+              </p>
+              {trainingLoading || isPageLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 p-3 rounded-lg"
+                  >
+                    <Skeleton className="h-4 w-4 rounded" />
+                    <div className="space-y-1.5 flex-1">
+                      <Skeleton className="h-3.5 w-40 rounded" />
+                      <Skeleton className="h-3 w-16 rounded" />
+                    </div>
+                  </div>
+                ))
+              ) : trainingContent.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground">
+                  No training content available.{" "}
+                  <button
+                    type="button"
+                    className="underline text-primary"
+                    onClick={() => navigate("/training/create")}
+                  >
+                    Create one first.
+                  </button>
+                </div>
+              ) : (
+                trainingContent.map((t) => {
+                  const selected = form.remediationTrainingIds.includes(
+                    t._id,
+                  );
+                  return (
+                    <label
+                      key={t._id}
+                      onClick={() => toggleTraining(t._id)}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer",
+                        selected
+                          ? "border-primary/30 bg-primary/5"
+                          : "border-transparent hover:bg-secondary/50",
+                      )}
+                    >
+                      <div
+                        className={cn(
+                          "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors pointer-events-none",
+                          selected
+                            ? "bg-primary border-primary"
+                            : "border-border bg-background",
+                        )}
+                      >
+                        {selected && (
+                          <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 pointer-events-none">
+                        <p className="text-sm font-medium">{t.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {t.type}
+                          {t.quizId ? " · includes quiz" : ""}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* Step 6: Schedule */}
+          {step === 5 && (
             <div className="space-y-5">
               {/* Timezone — top so both date rows share context */}
               <div className="space-y-2">
@@ -714,8 +825,8 @@ export default function CreateCampaign() {
             </div>
           )}
 
-          {/* Step 6: Sending Config */}
-          {step === 5 && (
+          {/* Step 7: Sending Config */}
+          {step === 6 && (
             <div className="space-y-6">
               <div className="space-y-3">
                 <div>
@@ -911,8 +1022,8 @@ export default function CreateCampaign() {
             </div>
           )}
 
-          {/* Step 7: Review */}
-          {step === 6 && (
+          {/* Step 8: Review */}
+          {step === 7 && (
             <div className="space-y-4">
               <h3 className="font-semibold">Review Campaign</h3>
               <div className="space-y-0 divide-y divide-border text-sm">
@@ -954,6 +1065,18 @@ export default function CreateCampaign() {
                   <span className="text-muted-foreground">Landing Page</span>
                   <span className="font-medium">
                     {selectedLandingPage?.name ?? (
+                      <span className="text-muted-foreground">None</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between py-3">
+                  <span className="text-muted-foreground">
+                    Remediation Training
+                  </span>
+                  <span className="font-medium text-right max-w-[200px]">
+                    {selectedTrainings.length > 0 ? (
+                      selectedTrainings.map((t) => t.title).join(", ")
+                    ) : (
                       <span className="text-muted-foreground">None</span>
                     )}
                   </span>
