@@ -12,6 +12,7 @@ const variants = {
   passed: "bg-accent/10 text-accent border-accent/20",
   failed: "bg-destructive/10 text-destructive border-destructive/20",
   pending: "bg-chart-4/10 text-chart-4 border-chart-4/20",
+  sent: "bg-accent/10 text-accent border-accent/20",
 };
 
 export default function StatusBadge({ status }) {

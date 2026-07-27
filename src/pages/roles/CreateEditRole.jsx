@@ -11,37 +11,89 @@ import { Skeleton } from "@/components/ui/skeleton";
 import PageHeader from "../../components/shared/PageHeader";
 import api from "@/api/axios";
 
+// Permission values MUST exactly match the module:Action strings checked by
+// requirePermission() in the backend route files (see backend/src/seed.js's
+// ALL_PERMISSIONS for the canonical list this mirrors).
 const permissionGroups = [
   {
     group: "Users",
-    perms: ["View Users", "Create Users", "Edit Users", "Delete Users"],
+    perms: [
+      { value: "users:View", label: "View Users" },
+      { value: "users:Create", label: "Create Users" },
+      { value: "users:Edit", label: "Edit Users" },
+      { value: "users:Delete", label: "Delete Users" },
+    ],
+  },
+  {
+    group: "Groups",
+    perms: [
+      { value: "groups:View", label: "View Groups" },
+      { value: "groups:Create", label: "Create Groups" },
+      { value: "groups:Edit", label: "Edit Groups" },
+      { value: "groups:Delete", label: "Delete Groups" },
+    ],
   },
   {
     group: "Campaigns",
     perms: [
-      "View Campaigns",
-      "Create Campaigns",
-      "Edit Campaigns",
-      "Launch Campaigns",
+      { value: "campaigns:View", label: "View Campaigns" },
+      { value: "campaigns:Create", label: "Create Campaigns" },
+      { value: "campaigns:Edit", label: "Edit Campaigns" },
+      { value: "campaigns:Delete", label: "Delete Campaigns" },
+      { value: "campaigns:Launch", label: "Launch Campaigns" },
     ],
   },
   {
     group: "Templates",
     perms: [
-      "View Templates",
-      "Create Templates",
-      "Edit Templates",
-      "Delete Templates",
+      { value: "templates:View", label: "View Templates" },
+      { value: "templates:Create", label: "Create Templates" },
+      { value: "templates:Edit", label: "Edit Templates" },
+      { value: "templates:Delete", label: "Delete Templates" },
     ],
   },
-  { group: "Analytics", perms: ["View Analytics", "Export Reports"] },
+  {
+    group: "Landing Pages",
+    perms: [
+      { value: "landing-pages:View", label: "View Landing Pages" },
+      { value: "landing-pages:Create", label: "Create Landing Pages" },
+      { value: "landing-pages:Edit", label: "Edit Landing Pages" },
+      { value: "landing-pages:Delete", label: "Delete Landing Pages" },
+    ],
+  },
+  {
+    group: "Tracking Logs",
+    perms: [{ value: "tracking-logs:View", label: "View Tracking Logs" }],
+  },
   {
     group: "Training",
-    perms: ["View Training", "Create Training", "Manage Quizzes"],
+    perms: [
+      { value: "training:View", label: "View Training" },
+      { value: "training:Create", label: "Create Training" },
+      { value: "training:Edit", label: "Edit Training" },
+      { value: "training:Delete", label: "Delete Training" },
+      { value: "training:Manage Quizzes", label: "Manage Quizzes" },
+      { value: "training:Manage Records", label: "Manage Training Records" },
+    ],
+  },
+  {
+    group: "Analytics",
+    perms: [
+      { value: "analytics:View", label: "View Analytics" },
+      { value: "analytics:Export Reports", label: "Export Reports" },
+    ],
   },
   {
     group: "Settings",
-    perms: ["View Settings", "Edit Settings", "Manage Admins"],
+    perms: [
+      { value: "settings:View", label: "View Settings" },
+      { value: "settings:Edit", label: "Edit Settings" },
+      { value: "settings:Manage Admins", label: "Manage Admins & Roles" },
+    ],
+  },
+  {
+    group: "Audit Logs",
+    perms: [{ value: "audit-logs:View", label: "View Audit Logs" }],
   },
 ];
 
@@ -56,7 +108,7 @@ export default function CreateEditRole() {
   const [permissions, setPermissions] = useState([]);
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
 
-  const allPerms = permissionGroups.flatMap((pg) => pg.perms);
+  const allPerms = permissionGroups.flatMap((pg) => pg.perms.map((p) => p.value));
   const allSelected =
     allPerms.length > 0 && allPerms.every((p) => permissions.includes(p));
   const someSelected = allPerms.some((p) => permissions.includes(p));
@@ -211,10 +263,10 @@ export default function CreateEditRole() {
             <div className="space-y-2">
               {permissionGroups.map((pg) => {
                 const groupAllSelected = pg.perms.every((p) =>
-                  permissions.includes(p),
+                  permissions.includes(p.value),
                 );
                 const groupSomeSelected = pg.perms.some((p) =>
-                  permissions.includes(p),
+                  permissions.includes(p.value),
                 );
                 const isCollapsed = collapsedGroups.has(pg.group);
                 return (
@@ -240,13 +292,16 @@ export default function CreateEditRole() {
                                 ? "indeterminate"
                                 : false
                           }
-                          onCheckedChange={() => toggleGroup(pg.perms)}
+                          onCheckedChange={() =>
+                            toggleGroup(pg.perms.map((p) => p.value))
+                          }
                         />
                         <span className="text-sm font-medium">{pg.group}</span>
                         <span className="text-xs text-muted-foreground">
                           {
-                            pg.perms.filter((p) => permissions.includes(p))
-                              .length
+                            pg.perms.filter((p) =>
+                              permissions.includes(p.value),
+                            ).length
                           }
                           /{pg.perms.length}
                         </span>
@@ -263,14 +318,16 @@ export default function CreateEditRole() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 p-3">
                         {pg.perms.map((perm) => (
                           <label
-                            key={perm}
+                            key={perm.value}
                             className="flex items-center gap-2.5 p-2.5 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer"
                           >
                             <Checkbox
-                              checked={permissions.includes(perm)}
-                              onCheckedChange={() => togglePermission(perm)}
+                              checked={permissions.includes(perm.value)}
+                              onCheckedChange={() =>
+                                togglePermission(perm.value)
+                              }
                             />
-                            <span className="text-sm">{perm}</span>
+                            <span className="text-sm">{perm.label}</span>
                           </label>
                         ))}
                       </div>

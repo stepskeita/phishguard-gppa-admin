@@ -2,13 +2,21 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Settings2, X } from "lucide-react";
+import { Plus, Trash2, Settings2, X, Library, BookmarkPlus, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import PageHeader from "../../components/shared/PageHeader";
 import api from "@/api/axios";
 
@@ -21,8 +29,9 @@ export default function QuizManagement() {
   const [quizTitle, setQuizTitle] = useState("");
   const [questions, setQuestions] = useState([]);
   const [maxAttempts, setMaxAttempts] = useState(3);
-  const [timeLimitMinutes, setTimeLimitMinutes] = useState(30);
   const [passPercentage, setPassPercentage] = useState(75);
+  const [bankOpen, setBankOpen] = useState(false);
+  const [bankSearch, setBankSearch] = useState("");
 
   const { data: existing, isLoading: loadingQuiz } = useQuery({
     queryKey: ["quiz", id],
@@ -35,7 +44,6 @@ export default function QuizManagement() {
     if (existing) {
       setQuizTitle(existing.title ?? "");
       setMaxAttempts(existing.maxAttempts ?? 3);
-      setTimeLimitMinutes(existing.timeLimitMinutes ?? 30);
       setPassPercentage(existing.passPercentage ?? 75);
       setQuestions(
         (existing.questions ?? []).map((q) => ({
@@ -71,6 +79,26 @@ export default function QuizManagement() {
       toast.error(err.response?.data?.error ?? "Failed to save quiz"),
   });
 
+  const { data: bankData, isFetching: bankLoading } = useQuery({
+    queryKey: ["question-bank", bankSearch],
+    queryFn: () =>
+      api
+        .get("/question-bank", { params: { search: bankSearch || undefined, limit: 50 } })
+        .then((r) => r.data),
+    enabled: bankOpen,
+    staleTime: 10_000,
+  });
+
+  const saveToBankMutation = useMutation({
+    mutationFn: (payload) => api.post("/question-bank", payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["question-bank"] });
+      toast.success("Saved to question bank");
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.error ?? "Failed to save to bank"),
+  });
+
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   const handleSubmit = () => {
@@ -99,7 +127,6 @@ export default function QuizManagement() {
     const payload = {
       title: quizTitle.trim(),
       maxAttempts,
-      timeLimitMinutes,
       passPercentage,
       questions: questions.map(({ text, options, correct }) => ({
         text,
@@ -115,6 +142,35 @@ export default function QuizManagement() {
       ...questions,
       { id: Date.now(), text: "", options: ["", "", "", ""], correct: 0 },
     ]);
+  };
+  const addTrueFalseQuestion = () => {
+    setQuestions([
+      ...questions,
+      { id: Date.now(), text: "", options: ["True", "False"], correct: 0 },
+    ]);
+  };
+  const insertFromBank = (bankQuestion) => {
+    setQuestions([
+      ...questions,
+      {
+        id: Date.now(),
+        text: bankQuestion.text,
+        options: bankQuestion.options,
+        correct: bankQuestion.correctOptionIndex,
+      },
+    ]);
+    toast.success("Question inserted");
+  };
+  const saveQuestionToBank = (q) => {
+    if (!q.text.trim() || q.options.some((o) => !o.trim())) {
+      toast.error("Fill in the question text and all options before saving to the bank");
+      return;
+    }
+    saveToBankMutation.mutate({
+      text: q.text,
+      options: q.options,
+      correctOptionIndex: q.correct,
+    });
   };
   const removeQuestion = (qId) =>
     setQuestions(questions.filter((q) => q.id !== qId));
@@ -210,26 +266,6 @@ export default function QuizManagement() {
             </div>
           </div>
 
-          {/* Time Limit */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm">Assignment Time</Label>
-              <span className="text-sm font-semibold text-primary">{timeLimitMinutes} min</span>
-            </div>
-            <Slider
-              min={5}
-              max={180}
-              step={5}
-              value={[timeLimitMinutes]}
-              onValueChange={([v]) => setTimeLimitMinutes(v)}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>5 min</span>
-              <span>180 min</span>
-            </div>
-          </div>
-
           {/* Pass Percentage */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -264,14 +300,26 @@ export default function QuizManagement() {
             >
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-semibold">Question {qi + 1}</h4>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => removeQuestion(q.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Save to question bank"
+                    className="h-7 w-7 text-muted-foreground hover:text-primary"
+                    onClick={() => saveQuestionToBank(q)}
+                    disabled={saveToBankMutation.isPending}
+                  >
+                    <BookmarkPlus className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    onClick={() => removeQuestion(q.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <Input
                 value={q.text}
@@ -332,13 +380,29 @@ export default function QuizManagement() {
           ))
         )}
 
-        <Button
-          variant="outline"
-          onClick={addQuestion}
-          className="w-full gap-2"
-        >
-          <Plus className="h-4 w-4" /> Add Question
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={addQuestion}
+            className="flex-1 gap-2"
+          >
+            <Plus className="h-4 w-4" /> Add Question
+          </Button>
+          <Button
+            variant="outline"
+            onClick={addTrueFalseQuestion}
+            className="gap-2"
+          >
+            <CheckCircle2 className="h-4 w-4" /> True/False
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setBankOpen(true)}
+            className="gap-2"
+          >
+            <Library className="h-4 w-4" /> Question Bank
+          </Button>
+        </div>
 
         <div className="flex items-center gap-3">
           <Button onClick={handleSubmit} disabled={isPending}>
@@ -359,6 +423,66 @@ export default function QuizManagement() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={bankOpen} onOpenChange={setBankOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Question Bank</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={bankSearch}
+            onChange={(e) => setBankSearch(e.target.value)}
+            placeholder="Search questions..."
+            className="bg-secondary border-0"
+          />
+          <ScrollArea className="h-80 pr-3">
+            {bankLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full rounded-lg" />
+                <Skeleton className="h-16 w-full rounded-lg" />
+                <Skeleton className="h-16 w-full rounded-lg" />
+              </div>
+            ) : bankData?.data?.length ? (
+              <div className="space-y-2">
+                {bankData.data.map((bq) => (
+                  <div
+                    key={bq._id}
+                    className="p-3 rounded-lg border border-border flex items-start justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{bq.text}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {bq.options.length} options
+                      </p>
+                      {bq.tags?.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {bq.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="text-[10px]">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => insertFromBank(bq)}
+                    >
+                      Insert
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No questions in the bank yet. Save a question from this quiz to get started.
+              </p>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

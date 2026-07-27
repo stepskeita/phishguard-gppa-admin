@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toast } from "sonner";
 import { API_CONFIG } from "@/lib/environment";
 
 const TOKEN_KEY = "phish-guard-token";
@@ -22,13 +23,19 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ── Response: handle 401 ─────────────────────────────────────────────────────
+// ── Response: handle 401 / 403 ────────────────────────────────────────────────
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
       window.location.replace('/login');
+    }
+    // Mutating requests already surface permission errors via each page's
+    // own onError toast (using the same response body) — only add a global
+    // toast for GETs, which otherwise fail silently with no visible error.
+    if (error.response?.status === 403 && error.config?.method === 'get') {
+      toast.error(error.response?.data?.error || "You don't have permission to view this.");
     }
     return Promise.reject(error);
   }

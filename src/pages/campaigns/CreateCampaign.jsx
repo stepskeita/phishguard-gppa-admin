@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Users } from "lucide-react";
+import { Check, Users, Lock, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import PageHeader from "../../components/shared/PageHeader";
 import StatusBadge from "../../components/shared/StatusBadge";
 import { cn } from "@/lib/utils";
@@ -36,6 +37,8 @@ const INITIAL = {
   description: "",
   targetGroupIds: [],
   emailTemplateId: "",
+  abTestEnabled: false,
+  abTestTemplateIds: [],
   landingPageId: "",
   remediationTrainingIds: [],
   startDate: "",
@@ -46,6 +49,9 @@ const INITIAL = {
   status: "Draft",
   smtpConfigId: "",
   sendingDomainId: "",
+  recurrenceEnabled: false,
+  recurrenceIntervalDays: 30,
+  recurrenceMaxOccurrences: 3,
 };
 
 export default function CreateCampaign() {
@@ -128,6 +134,10 @@ export default function CreateCampaign() {
           existingCampaign.emailTemplateId?._id ??
           existingCampaign.emailTemplateId ??
           "",
+        abTestEnabled: (existingCampaign.abTestTemplateIds?.length ?? 0) >= 2,
+        abTestTemplateIds: (existingCampaign.abTestTemplateIds ?? []).map(
+          (t) => t._id ?? t,
+        ),
         landingPageId:
           existingCampaign.landingPageId?._id ??
           existingCampaign.landingPageId ??
@@ -149,6 +159,10 @@ export default function CreateCampaign() {
         endTime: endDt ? endDt.toISOString().slice(11, 16) : "",
         timezone: existingCampaign.timezone ?? "UTC",
         status: existingCampaign.status ?? "Draft",
+        recurrenceEnabled: existingCampaign.recurrence?.enabled ?? false,
+        recurrenceIntervalDays: existingCampaign.recurrence?.intervalDays ?? 30,
+        recurrenceMaxOccurrences:
+          existingCampaign.recurrence?.maxOccurrences ?? 3,
       });
     }
   }, [existingCampaign]);
@@ -194,6 +208,14 @@ export default function CreateCampaign() {
         : [...prev.targetGroupIds, groupId],
     }));
 
+  const toggleAbTemplate = (templateId) =>
+    setForm((prev) => ({
+      ...prev,
+      abTestTemplateIds: prev.abTestTemplateIds.includes(templateId)
+        ? prev.abTestTemplateIds.filter((t) => t !== templateId)
+        : [...prev.abTestTemplateIds, templateId],
+    }));
+
   const toggleTraining = (contentId) =>
     setForm((prev) => ({
       ...prev,
@@ -226,12 +248,23 @@ export default function CreateCampaign() {
       description: form.description.trim(),
       targetGroupIds: form.targetGroupIds,
       emailTemplateId: form.emailTemplateId || undefined,
+      abTestTemplateIds: form.abTestEnabled ? form.abTestTemplateIds : [],
       landingPageId: form.landingPageId || undefined,
       remediationTrainingIds: form.remediationTrainingIds,
       smtpConfigId: form.smtpConfigId || undefined,
       sendingDomainId: form.sendingDomainId || undefined,
       timezone: form.timezone,
       endDate: form.endDate ? buildDateTime(form.endDate, form.endTime) : null,
+      // occurrencesRun/nextRunAt are scheduler-owned — carry forward the
+      // existing values rather than let this update reset an in-progress
+      // series back to its schema defaults.
+      recurrence: {
+        enabled: form.recurrenceEnabled,
+        intervalDays: form.recurrenceIntervalDays,
+        maxOccurrences: form.recurrenceMaxOccurrences,
+        occurrencesRun: existingCampaign?.recurrence?.occurrencesRun ?? 1,
+        nextRunAt: existingCampaign?.recurrence?.nextRunAt ?? null,
+      },
       // Auto-set status to Scheduled when a future startDate is provided
       status: form.startDate
         ? "Scheduled"
@@ -241,6 +274,20 @@ export default function CreateCampaign() {
     };
     if (form.startDate) {
       payload.startDate = buildDateTime(form.startDate, form.startTime);
+    }
+
+    // Once launched, the attack-config fields are server-locked — omit them
+    // entirely rather than resend unchanged values that could theoretically
+    // fail the backend's equality check (e.g. array re-ordering).
+    if (fieldsLocked) {
+      delete payload.targetGroupIds;
+      delete payload.emailTemplateId;
+      delete payload.abTestTemplateIds;
+      delete payload.landingPageId;
+      delete payload.remediationTrainingIds;
+      delete payload.smtpConfigId;
+      delete payload.sendingDomainId;
+      delete payload.startDate;
     }
     return payload;
   };
@@ -254,6 +301,10 @@ export default function CreateCampaign() {
       toast.error(scheduleError);
       return;
     }
+    if (form.abTestEnabled && form.abTestTemplateIds.length < 2) {
+      toast.error("Select at least 2 templates for A/B testing");
+      return;
+    }
     const payload = buildPayload();
     isEdit ? updateMutation.mutate(payload) : createMutation.mutate(payload);
   };
@@ -262,6 +313,10 @@ export default function CreateCampaign() {
   const selectedTemplate = useMemo(
     () => templates.find((t) => t._id === form.emailTemplateId),
     [templates, form.emailTemplateId],
+  );
+  const selectedAbTemplates = useMemo(
+    () => templates.filter((t) => form.abTestTemplateIds.includes(t._id)),
+    [templates, form.abTestTemplateIds],
   );
   const selectedLandingPage = useMemo(
     () => landingPages.find((lp) => lp._id === form.landingPageId),
@@ -289,6 +344,13 @@ export default function CreateCampaign() {
   );
 
   const isPageLoading = isEdit && campaignLoading;
+
+  // Once a campaign has launched, its "attack config" (who/what/how it was
+  // sent) is locked server-side (see campaignController.js's
+  // LOCKED_AFTER_LAUNCH_FIELDS) — mirror that here so the UI doesn't let an
+  // admin build a change the API will just reject.
+  const fieldsLocked = isEdit && Boolean(existingCampaign?.launchedAt);
+  const lockedClass = fieldsLocked ? "pointer-events-none opacity-50" : "";
 
   return (
     <div>
@@ -341,6 +403,17 @@ export default function CreateCampaign() {
           </div>
         ))}
       </div>
+      {fieldsLocked && (
+        <div className="mb-4 max-w-5xl flex items-center gap-3 bg-secondary border border-border text-sm rounded-xl px-4 py-3">
+          <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="text-muted-foreground">
+            This campaign has already launched — targeting, template, landing
+            page, remediation training, start date, and sending config are
+            locked. Name, description, end date, and status can still be
+            changed.
+          </span>
+        </div>
+      )}
       <div className={step === 2 ? "max-w-5xl" : "max-w-2xl"}>
         <div className="bg-card border border-border rounded-xl p-6">
           {/* Step 1: Basic Info */}
@@ -427,7 +500,8 @@ export default function CreateCampaign() {
                   </button>
                 </div>
               ) : (
-                groups.map((g) => {
+                <div className={cn("space-y-3", lockedClass)}>
+                {groups.map((g) => {
                   const selected = form.targetGroupIds.includes(g._id);
                   return (
                     <label
@@ -461,7 +535,8 @@ export default function CreateCampaign() {
                       </div>
                     </label>
                   );
-                })
+                })}
+                </div>
               )}
             </div>
           )}
@@ -471,7 +546,41 @@ export default function CreateCampaign() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left: template list */}
               <div className="space-y-3">
-                <Label>Choose Email Template</Label>
+                <div className="flex items-center justify-between">
+                  <Label>
+                    {form.abTestEnabled
+                      ? "Choose Email Templates (A/B Test)"
+                      : "Choose Email Template"}
+                  </Label>
+                  <label
+                    className={cn(
+                      "flex items-center gap-2 cursor-pointer",
+                      lockedClass,
+                    )}
+                  >
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <FlaskConical className="h-3 w-3" /> A/B Test
+                    </span>
+                    <Switch
+                      checked={form.abTestEnabled}
+                      onCheckedChange={(v) =>
+                        setForm((prev) => ({ ...prev, abTestEnabled: v }))
+                      }
+                    />
+                  </label>
+                </div>
+                {form.abTestEnabled && (
+                  <p className="text-xs text-muted-foreground -mt-1">
+                    Select 2 or more templates. Each recipient is randomly
+                    assigned one variant with equal weight, so you can compare
+                    click/submit rates per template afterward.
+                    {form.abTestTemplateIds.length > 0 && (
+                      <span className="ml-1 text-foreground">
+                        {form.abTestTemplateIds.length} selected.
+                      </span>
+                    )}
+                  </p>
+                )}
                 {templatesLoading || isPageLoading ? (
                   Array.from({ length: 4 }).map((_, i) => (
                     <Skeleton key={i} className="h-14 w-full rounded-lg" />
@@ -488,13 +597,19 @@ export default function CreateCampaign() {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className={cn("space-y-2", lockedClass)}>
                     {templates.map((t) => {
-                      const sel = form.emailTemplateId === t._id;
+                      const sel = form.abTestEnabled
+                        ? form.abTestTemplateIds.includes(t._id)
+                        : form.emailTemplateId === t._id;
                       return (
                         <label
                           key={t._id}
-                          onClick={() => set("emailTemplateId")(t._id)}
+                          onClick={() =>
+                            form.abTestEnabled
+                              ? toggleAbTemplate(t._id)
+                              : set("emailTemplateId")(t._id)
+                          }
                           className={cn(
                             "flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer",
                             sel
@@ -504,15 +619,21 @@ export default function CreateCampaign() {
                         >
                           <div
                             className={cn(
-                              "h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-colors pointer-events-none",
+                              "border flex items-center justify-center shrink-0 transition-colors pointer-events-none",
+                              form.abTestEnabled
+                                ? "h-4 w-4 rounded"
+                                : "h-4 w-4 rounded-full",
                               sel
                                 ? "bg-primary border-primary"
                                 : "border-border",
                             )}
                           >
-                            {sel && (
-                              <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
-                            )}
+                            {sel &&
+                              (form.abTestEnabled ? (
+                                <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                              ) : (
+                                <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                              ))}
                           </div>
                           <div className="flex-1 pointer-events-none">
                             <p className="text-sm font-medium">{t.name}</p>
@@ -533,7 +654,7 @@ export default function CreateCampaign() {
               {/* Right: preview panel */}
               <div className="flex flex-col">
                 <Label className="mb-3">Preview</Label>
-                {selectedTemplate ? (
+                {!form.abTestEnabled && selectedTemplate ? (
                   <div className="flex-1 bg-secondary rounded-xl p-4 flex flex-col gap-3">
                     <div className="bg-card rounded-lg p-4 text-sm space-y-2 border border-border flex-1">
                       <p className="font-semibold text-foreground">
@@ -559,9 +680,27 @@ export default function CreateCampaign() {
                       {selectedTemplate.type}
                     </span>
                   </div>
+                ) : form.abTestEnabled && selectedAbTemplates.length > 0 ? (
+                  <div className="flex-1 bg-secondary rounded-xl p-4 space-y-3 overflow-y-auto max-h-[420px]">
+                    {selectedAbTemplates.map((t) => (
+                      <div
+                        key={t._id}
+                        className="bg-card rounded-lg p-3 text-sm border border-border"
+                      >
+                        <p className="font-semibold text-foreground text-xs mb-1">
+                          {t.name}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {t.subject}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <div className="flex-1 bg-secondary rounded-xl min-h-[180px] flex items-center justify-center text-sm text-muted-foreground">
-                    Select a template to see a preview
+                    {form.abTestEnabled
+                      ? "Select 2+ templates to compare"
+                      : "Select a template to see a preview"}
                   </div>
                 )}
               </div>
@@ -579,6 +718,7 @@ export default function CreateCampaign() {
                   <Select
                     value={form.landingPageId}
                     onValueChange={set("landingPageId")}
+                    disabled={fieldsLocked}
                   >
                     <SelectTrigger className="bg-secondary border-0">
                       <SelectValue placeholder="Choose a landing page" />
@@ -676,7 +816,8 @@ export default function CreateCampaign() {
                   </button>
                 </div>
               ) : (
-                trainingContent.map((t) => {
+                <div className={cn("space-y-3", lockedClass)}>
+                {trainingContent.map((t) => {
                   const selected = form.remediationTrainingIds.includes(
                     t._id,
                   );
@@ -712,7 +853,8 @@ export default function CreateCampaign() {
                       </div>
                     </label>
                   );
-                })
+                })}
+                </div>
               )}
             </div>
           )}
@@ -760,6 +902,7 @@ export default function CreateCampaign() {
                       className="bg-secondary border-0 cursor-pointer text-foreground [color-scheme:light] dark:[color-scheme:dark] w-full"
                       value={form.startDate}
                       onChange={set("startDate")}
+                      disabled={fieldsLocked}
                     />
                   </div>
                   <div
@@ -773,6 +916,7 @@ export default function CreateCampaign() {
                       className="bg-secondary border-0 cursor-pointer text-foreground [color-scheme:light] dark:[color-scheme:dark] w-full"
                       value={form.startTime}
                       onChange={set("startTime")}
+                      disabled={fieldsLocked}
                     />
                   </div>
                 </div>
@@ -822,6 +966,74 @@ export default function CreateCampaign() {
               <p className="text-xs text-muted-foreground">
                 All times are interpreted as {form.timezone}. Leave end date blank for an open-ended campaign.
               </p>
+
+              {/* Recurrence */}
+              <div className="pt-4 border-t border-border space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="mb-0.5 block">Recurring Campaign</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Automatically launch a new wave on a repeating interval.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={form.recurrenceEnabled}
+                    onCheckedChange={(v) =>
+                      setForm((prev) => ({ ...prev, recurrenceEnabled: v }))
+                    }
+                  />
+                </div>
+                {form.recurrenceEnabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Repeat every (days)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={365}
+                        className="bg-secondary border-0"
+                        value={form.recurrenceIntervalDays}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            recurrenceIntervalDays: Math.min(
+                              365,
+                              Math.max(1, Number(e.target.value) || 1),
+                            ),
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Max occurrences</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={52}
+                        className="bg-secondary border-0"
+                        value={form.recurrenceMaxOccurrences}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            recurrenceMaxOccurrences: Math.min(
+                              52,
+                              Math.max(1, Number(e.target.value) || 1),
+                            ),
+                          }))
+                        }
+                      />
+                    </div>
+                    <p className="sm:col-span-2 text-xs text-muted-foreground">
+                      Each wave is launched as its own campaign (own stats and
+                      tracking), automatically {form.recurrenceIntervalDays}{" "}
+                      day{form.recurrenceIntervalDays === 1 ? "" : "s"} after
+                      the previous one, up to{" "}
+                      {form.recurrenceMaxOccurrences} total wave
+                      {form.recurrenceMaxOccurrences === 1 ? "" : "s"}.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -848,7 +1060,7 @@ export default function CreateCampaign() {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className={cn("space-y-2", lockedClass)}>
                     <label
                       onClick={() => set("smtpConfigId")("")}
                       className={cn(
@@ -942,7 +1154,7 @@ export default function CreateCampaign() {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className={cn("space-y-2", lockedClass)}>
                     <label
                       onClick={() => set("sendingDomainId")("")}
                       className={cn(
@@ -1054,10 +1266,22 @@ export default function CreateCampaign() {
                   </span>
                 </div>
                 <div className="flex justify-between py-3">
-                  <span className="text-muted-foreground">Email Template</span>
-                  <span className="font-medium">
-                    {selectedTemplate?.name ?? (
-                      <span className="text-muted-foreground">None</span>
+                  <span className="text-muted-foreground">
+                    {form.abTestEnabled ? "A/B Test Templates" : "Email Template"}
+                  </span>
+                  <span className="font-medium text-right max-w-[200px]">
+                    {form.abTestEnabled ? (
+                      selectedAbTemplates.length > 0 ? (
+                        selectedAbTemplates.map((t) => t.name).join(", ")
+                      ) : (
+                        <span className="text-destructive">
+                          Select 2+ templates
+                        </span>
+                      )
+                    ) : (
+                      (selectedTemplate?.name ?? (
+                        <span className="text-muted-foreground">None</span>
+                      ))
                     )}
                   </span>
                 </div>
@@ -1104,6 +1328,16 @@ export default function CreateCampaign() {
                 {scheduleError && (
                   <div className="py-2 text-sm text-destructive">{scheduleError}</div>
                 )}
+                <div className="flex justify-between py-3">
+                  <span className="text-muted-foreground">Recurrence</span>
+                  <span className="font-medium">
+                    {form.recurrenceEnabled ? (
+                      `Every ${form.recurrenceIntervalDays}d, up to ${form.recurrenceMaxOccurrences} waves`
+                    ) : (
+                      <span className="text-muted-foreground">One-time</span>
+                    )}
+                  </span>
+                </div>
                 <div className="flex justify-between py-3">
                   <span className="text-muted-foreground">SMTP Config</span>
                   <span className="font-medium">

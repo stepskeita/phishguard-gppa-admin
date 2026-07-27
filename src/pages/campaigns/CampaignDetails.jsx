@@ -10,6 +10,10 @@ import {
   Rocket,
   Clock,
   X,
+  AlertTriangle,
+  Copy,
+  FlaskConical,
+  Repeat,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -44,6 +48,28 @@ export default function CampaignDetails() {
     enabled: !!id,
   });
 
+  const { data: variantStats } = useQuery({
+    queryKey: ["campaign-variant-stats", id],
+    queryFn: () => api.get(`/campaigns/${id}/variant-stats`).then((r) => r.data),
+    enabled: !!id,
+  });
+
+  const { data: wavesRes } = useQuery({
+    queryKey: ["campaign-waves", campaign?.recurrenceGroupId],
+    queryFn: () =>
+      api
+        .get("/campaigns", {
+          params: { recurrenceGroupId: campaign.recurrenceGroupId, limit: 100 },
+        })
+        .then((r) => r.data),
+    enabled: !!campaign?.recurrenceGroupId,
+  });
+  const waves = (wavesRes?.data ?? [])
+    .slice()
+    .sort(
+      (a, b) => (a.recurrence?.occurrencesRun ?? 0) - (b.recurrence?.occurrencesRun ?? 0),
+    );
+
   const launchMutation = useMutation({
     mutationFn: () => api.post(`/campaigns/${id}/launch`),
     onSuccess: () => {
@@ -65,6 +91,17 @@ export default function CampaignDetails() {
     },
     onError: (err) =>
       toast.error(err.response?.data?.error ?? "Failed to cancel schedule"),
+  });
+
+  const cloneMutation = useMutation({
+    mutationFn: () => api.post(`/campaigns/${id}/clone`),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      toast.success("Campaign duplicated");
+      navigate(`/campaigns/${res.data._id}/edit`);
+    },
+    onError: (err) =>
+      toast.error(err.response?.data?.error ?? "Failed to duplicate campaign"),
   });
 
   const targetUsers = activityData?.data ?? [];
@@ -98,6 +135,15 @@ export default function CampaignDetails() {
         actions={
           <div className="flex items-center gap-2">
             <StatusBadge status={campaign.status} />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => cloneMutation.mutate()}
+              disabled={cloneMutation.isPending}
+            >
+              <Copy className="h-3.5 w-3.5 mr-1.5" />
+              Duplicate
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -159,6 +205,18 @@ export default function CampaignDetails() {
         </div>
       )}
 
+      {/* Auto-launch failure banner */}
+      {campaign.status === "Draft" && campaign.stats?.lastError && (
+        <div className="mb-6 flex items-center gap-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl px-4 py-3">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            The scheduled launch failed and this campaign was reverted to
+            Draft: <strong>{campaign.stats.lastError}</strong>. Fix the issue
+            and re-launch or reschedule.
+          </span>
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KpiCard
@@ -183,6 +241,107 @@ export default function CampaignDetails() {
         />
       </div>
 
+      {/* A/B Variant Performance */}
+      {variantStats?.length > 1 && (
+        <div className="bg-card border border-border rounded-xl overflow-hidden mb-6">
+          <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+            <FlaskConical className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">A/B Variant Performance</h3>
+          </div>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
+                  Template
+                </th>
+                <th className="px-5 py-3 text-right text-xs font-semibold text-muted-foreground uppercase">
+                  Sent
+                </th>
+                <th className="px-5 py-3 text-right text-xs font-semibold text-muted-foreground uppercase">
+                  Clicked
+                </th>
+                <th className="px-5 py-3 text-right text-xs font-semibold text-muted-foreground uppercase">
+                  Click Rate
+                </th>
+                <th className="px-5 py-3 text-right text-xs font-semibold text-muted-foreground uppercase">
+                  Submitted
+                </th>
+                <th className="px-5 py-3 text-right text-xs font-semibold text-muted-foreground uppercase">
+                  Submit Rate
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {variantStats
+                .slice()
+                .sort((a, b) => b.clickRate - a.clickRate)
+                .map((v, i) => (
+                  <tr
+                    key={v.templateId}
+                    className="border-b border-border/50 last:border-0"
+                  >
+                    <td className="px-5 py-3 text-sm font-medium">
+                      <div className="flex items-center gap-2">
+                        {i === 0 && v.sent > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">
+                            TOP
+                          </span>
+                        )}
+                        {v.name}
+                      </div>
+                      <p className="text-xs text-muted-foreground font-normal">
+                        {v.subject}
+                      </p>
+                    </td>
+                    <td className="px-5 py-3 text-sm text-right">{v.sent}</td>
+                    <td className="px-5 py-3 text-sm text-right">{v.clicked}</td>
+                    <td className="px-5 py-3 text-sm text-right font-medium">
+                      {v.clickRate}%
+                    </td>
+                    <td className="px-5 py-3 text-sm text-right">{v.submitted}</td>
+                    <td className="px-5 py-3 text-sm text-right font-medium">
+                      {v.submitRate}%
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Recurring campaign wave chain */}
+      {waves.length > 1 && (
+        <div className="bg-card border border-border rounded-xl p-5 mb-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Repeat className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Campaign Waves</h3>
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {waves.map((w, i) => (
+              <div key={w._id} className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => navigate(`/campaigns/${w._id}`)}
+                  className={cn(
+                    "flex flex-col items-start gap-0.5 px-3 py-2 rounded-lg border text-left transition-colors",
+                    w._id === id
+                      ? "border-primary/40 bg-primary/5"
+                      : "border-border hover:border-primary/20",
+                  )}
+                >
+                  <span className="text-xs font-semibold">
+                    Wave {w.recurrence?.occurrencesRun ?? i + 1}
+                  </span>
+                  <StatusBadge status={w.status} />
+                </button>
+                {i < waves.length - 1 && (
+                  <div className="w-4 h-px bg-border shrink-0" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Campaign Info */}
         <div className="bg-card border border-border rounded-xl p-5">
@@ -193,8 +352,21 @@ export default function CampaignDetails() {
               <StatusBadge status={campaign.status} />
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Email Template</span>
-              <span>{campaign.emailTemplateId?.name ?? "—"}</span>
+              <span className="text-muted-foreground">
+                {campaign.abTestTemplateIds?.length >= 2
+                  ? "A/B Test Templates"
+                  : "Email Template"}
+              </span>
+              <span className="text-right max-w-[220px]">
+                {campaign.abTestTemplateIds?.length >= 2 ? (
+                  <span className="inline-flex items-center gap-1">
+                    <FlaskConical className="h-3 w-3 text-primary shrink-0" />
+                    {campaign.abTestTemplateIds.map((t) => t.name ?? t).join(", ")}
+                  </span>
+                ) : (
+                  (campaign.emailTemplateId?.name ?? "—")
+                )}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Landing Page</span>
@@ -230,6 +402,32 @@ export default function CampaignDetails() {
                     hour: "2-digit",
                     minute: "2-digit",
                   })}
+                </span>
+              </div>
+            )}
+            {campaign.recurrence?.enabled && campaign.recurrence?.nextRunAt && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Next Wave</span>
+                <span className="inline-flex items-center gap-1">
+                  <Repeat className="h-3 w-3 text-primary shrink-0" />
+                  {new Date(campaign.recurrence.nextRunAt).toLocaleDateString(
+                    "en-US",
+                    { month: "short", day: "numeric", year: "numeric" },
+                  )}
+                  {" · wave "}
+                  {(campaign.recurrence.occurrencesRun ?? 1) + 1}/
+                  {campaign.recurrence.maxOccurrences}
+                </span>
+              </div>
+            )}
+            {campaign.recurrenceGroupId && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Wave</span>
+                <span>
+                  {campaign.recurrence?.occurrencesRun ?? 1}
+                  {campaign.recurrence?.maxOccurrences
+                    ? ` of ${campaign.recurrence.maxOccurrences}`
+                    : ""}
                 </span>
               </div>
             )}
@@ -273,6 +471,9 @@ export default function CampaignDetails() {
                     Email
                   </th>
                   <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
+                    Send Status
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
                     Action
                   </th>
                   <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
@@ -295,8 +496,21 @@ export default function CampaignDetails() {
                     <td className="px-5 py-3 text-sm text-muted-foreground">
                       {log.userId?.email ?? "—"}
                     </td>
+                    <td className="px-5 py-3" title={log.sendError ?? undefined}>
+                      {log.sendStatus ? (
+                        <StatusBadge status={log.sendStatus} />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="px-5 py-3">
-                      <StatusBadge status={log.action} />
+                      {log.action ? (
+                        <StatusBadge status={log.action} />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Not clicked
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3">
                       {log.trainingRecords?.length > 0 ? (

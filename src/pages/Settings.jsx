@@ -11,6 +11,8 @@ import {
   WifiOff,
   Globe,
   Server,
+  Check,
+  ShieldAlert,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -1176,6 +1178,105 @@ function NotificationsTab({ settings, isLoading, onSave, isPending }) {
   );
 }
 
+function RiskAutoAssignTab({ settings, isLoading, onSave, isPending }) {
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  useEffect(() => {
+    if (settings) {
+      setSelectedIds(
+        (settings.riskAutoAssignTrainingIds ?? []).map((t) => t._id ?? t),
+      );
+    }
+  }, [settings]);
+
+  const { data: trainingRes, isLoading: trainingLoading } = useQuery({
+    queryKey: ["training"],
+    queryFn: () =>
+      api.get("/training", { params: { limit: 100 } }).then((r) => r.data),
+    staleTime: 60_000,
+  });
+  const trainingContent = trainingRes?.data ?? [];
+
+  const toggle = (contentId) =>
+    setSelectedIds((prev) =>
+      prev.includes(contentId)
+        ? prev.filter((t) => t !== contentId)
+        : [...prev, contentId],
+    );
+
+  return (
+    <div className="max-w-2xl bg-card border border-border rounded-xl p-6 space-y-5">
+      <div className="flex items-center gap-2">
+        <ShieldAlert className="h-4 w-4 text-primary" />
+        <div>
+          <p className="text-sm font-semibold">Risk Auto-Assignment</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            When a user's risk score crosses into <strong>High</strong>, automatically
+            enroll them in the training selected below — independent of any
+            campaign. Leave empty to disable this behavior.
+          </p>
+        </div>
+      </div>
+
+      {isLoading || trainingLoading ? (
+        Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3 p-3 rounded-lg">
+            <Skeleton className="h-4 w-4 rounded" />
+            <Skeleton className="h-3.5 w-48 rounded" />
+          </div>
+        ))
+      ) : trainingContent.length === 0 ? (
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          No training content available yet.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {trainingContent.map((t) => {
+            const selected = selectedIds.includes(t._id);
+            return (
+              <label
+                key={t._id}
+                onClick={() => toggle(t._id)}
+                className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
+                  selected
+                    ? "border-primary/30 bg-primary/5"
+                    : "border-transparent hover:bg-secondary/50"
+                }`}
+              >
+                <div
+                  className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors pointer-events-none ${
+                    selected
+                      ? "bg-primary border-primary"
+                      : "border-border bg-background"
+                  }`}
+                >
+                  {selected && (
+                    <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 pointer-events-none">
+                  <p className="text-sm font-medium">{t.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t.type}
+                    {t.quizId ? " · includes quiz" : ""}
+                  </p>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      )}
+
+      <Button
+        onClick={() => onSave({ riskAutoAssignTrainingIds: selectedIds })}
+        disabled={isPending}
+      >
+        {isPending ? "Saving…" : "Save Changes"}
+      </Button>
+    </div>
+  );
+}
+
 export default function Settings() {
   const queryClient = useQueryClient();
 
@@ -1209,6 +1310,7 @@ export default function Settings() {
           <TabsTrigger value="email">Email (SMTP)</TabsTrigger>
           <TabsTrigger value="domain">Sending Domains</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="risk-training">Risk Auto-Assign</TabsTrigger>
           <TabsTrigger value="departments">Departments</TabsTrigger>
         </TabsList>
 
@@ -1231,6 +1333,15 @@ export default function Settings() {
 
         <TabsContent value="notifications">
           <NotificationsTab
+            settings={settings}
+            isLoading={isLoading}
+            onSave={saveMutation.mutate}
+            isPending={saveMutation.isPending}
+          />
+        </TabsContent>
+
+        <TabsContent value="risk-training">
+          <RiskAutoAssignTab
             settings={settings}
             isLoading={isLoading}
             onSave={saveMutation.mutate}

@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   BarChart,
   Bar,
@@ -15,8 +17,16 @@ import {
 } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Download, Trophy, Timer } from "lucide-react";
 import PageHeader from "../../components/shared/PageHeader";
+import KpiCard from "../../components/shared/KpiCard";
 import api from "@/api/axios";
 
 const RISK_COLORS = {
@@ -25,7 +35,46 @@ const RISK_COLORS = {
   Low: "hsl(172 66% 50%)",
 };
 
+const REPORT_OPTIONS = [
+  { value: "overview", label: "Campaign Performance" },
+  { value: "training", label: "Training Completion" },
+  { value: "department", label: "Department Breakdown" },
+  { value: "leaderboard", label: "Repeat-Clicker Leaderboard" },
+];
+
+function formatDuration(seconds) {
+  if (seconds == null) return "—";
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+  return `${Math.round(seconds / 86400)}d`;
+}
+
 export default function AnalyticsDashboard() {
+  const [exporting, setExporting] = useState(false);
+  const [reportType, setReportType] = useState("overview");
+
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      const res = await api.get("/analytics/export", {
+        params: { report: reportType },
+        responseType: "blob",
+      });
+      const blob = new Blob([res.data], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${reportType}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to export report");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const { data: performanceData = [] } = useQuery({
     queryKey: ["analytics-overview"],
     queryFn: () => api.get("/analytics/overview").then((r) => r.data),
@@ -44,6 +93,30 @@ export default function AnalyticsDashboard() {
       api
         .get("/analytics/submission-trend", { params: { months: 6 } })
         .then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const { data: funnel } = useQuery({
+    queryKey: ["analytics-training-funnel"],
+    queryFn: () => api.get("/analytics/training-funnel").then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ["analytics-department-breakdown"],
+    queryFn: () => api.get("/analytics/department-breakdown").then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const { data: leaderboard = [] } = useQuery({
+    queryKey: ["analytics-leaderboard"],
+    queryFn: () => api.get("/analytics/leaderboard", { params: { limit: 10 } }).then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const { data: timeToClick } = useQuery({
+    queryKey: ["analytics-time-to-click"],
+    queryFn: () => api.get("/analytics/time-to-click").then((r) => r.data),
     staleTime: 60_000,
   });
 
@@ -72,7 +145,7 @@ export default function AnalyticsDashboard() {
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard">
+        <TabsContent value="dashboard" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Campaign Performance */}
             <div className="bg-card border border-border rounded-xl p-5">
@@ -213,24 +286,170 @@ export default function AnalyticsDashboard() {
               </div>
             </div>
           </div>
+
+          {/* Training Completion Funnel */}
+          <div className="bg-card border border-border rounded-xl p-5">
+            <h3 className="text-sm font-semibold mb-4">
+              Training Completion Funnel
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+              <KpiCard title="Enrolled" value={funnel?.enrolled ?? 0} />
+              <KpiCard title="Not Started" value={funnel?.notStarted ?? 0} />
+              <KpiCard title="In Progress" value={funnel?.inProgress ?? 0} />
+              <KpiCard title="Passed" value={funnel?.passed ?? 0} />
+              <KpiCard title="Pass Rate" value={`${funnel?.passRate ?? 0}%`} />
+            </div>
+            {funnel?.byContent?.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Training</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Enrolled</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Passed</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Failed</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Pass Rate</th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Avg Attempts</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {funnel.byContent.map((t) => (
+                      <tr key={t.trainingContentId} className="border-b border-border/50 last:border-0">
+                        <td className="px-3 py-2.5 text-sm font-medium">{t.title}</td>
+                        <td className="px-3 py-2.5 text-sm text-muted-foreground">{t.enrolled}</td>
+                        <td className="px-3 py-2.5 text-sm text-muted-foreground">{t.passed}</td>
+                        <td className="px-3 py-2.5 text-sm text-muted-foreground">{t.failed}</td>
+                        <td className="px-3 py-2.5 text-sm text-muted-foreground">{t.passRate}%</td>
+                        <td className="px-3 py-2.5 text-sm text-muted-foreground">{t.avgAttempts}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Department Breakdown */}
+            <div className="bg-card border border-border rounded-xl p-5">
+              <h3 className="text-sm font-semibold mb-4">Risk by Department</h3>
+              {departments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No department data yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Dept</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Low</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Med</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">High</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground uppercase">Clicked</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {departments.map((d) => (
+                        <tr key={d.department} className="border-b border-border/50 last:border-0">
+                          <td className="px-3 py-2.5 text-sm font-medium">{d.department}</td>
+                          <td className="px-3 py-2.5 text-sm text-accent">{d.low}</td>
+                          <td className="px-3 py-2.5 text-sm text-chart-4">{d.medium}</td>
+                          <td className="px-3 py-2.5 text-sm text-destructive">{d.high}</td>
+                          <td className="px-3 py-2.5 text-sm text-muted-foreground">{d.clicked}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Repeat-Clicker Leaderboard */}
+            <div className="bg-card border border-border rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Trophy className="h-4 w-4 text-chart-4" />
+                <h3 className="text-sm font-semibold">Repeat-Clicker Leaderboard</h3>
+              </div>
+              {leaderboard.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No click activity yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {leaderboard.map((u, i) => (
+                    <div key={u.userId} className="flex items-center justify-between text-sm py-1.5">
+                      <div className="flex items-center gap-2.5">
+                        <span className="h-5 w-5 rounded-full bg-secondary flex items-center justify-center text-xs text-muted-foreground shrink-0">
+                          {i + 1}
+                        </span>
+                        <div>
+                          <p className="font-medium">{u.name || u.email}</p>
+                          <p className="text-xs text-muted-foreground">{u.department}</p>
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground text-right">
+                        <span className="text-chart-4">{u.clickedCount} clicked</span>
+                        {u.submittedCount > 0 && (
+                          <span className="text-destructive ml-2">{u.submittedCount} submitted</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Time to Click */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <KpiCard
+              title="Avg Time to Click"
+              value={formatDuration(timeToClick?.avgSeconds)}
+              icon={Timer}
+            />
+            <KpiCard
+              title="Median Time to Click"
+              value={formatDuration(timeToClick?.medianSeconds)}
+              icon={Timer}
+            />
+            <KpiCard
+              title="Clicks Measured"
+              value={timeToClick?.sampleSize ?? 0}
+              icon={Timer}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="reports">
           <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
               <h3 className="text-sm font-semibold">Generated Reports</h3>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="gap-2 text-xs">
-                  <Download className="h-3.5 w-3.5" /> Export CSV
+              <div className="flex gap-2 items-center">
+                <Select value={reportType} onValueChange={setReportType}>
+                  <SelectTrigger className="bg-secondary border-0 w-56 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REPORT_OPTIONS.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-xs"
+                  onClick={handleExportCsv}
+                  disabled={exporting}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {exporting ? "Exporting…" : "Export CSV"}
                 </Button>
-                <Button variant="outline" size="sm" className="gap-2 text-xs">
-                  <Download className="h-3.5 w-3.5" /> Export PDF
+                <Button variant="outline" size="sm" className="gap-2 text-xs" disabled title="PDF export is coming soon">
+                  <Download className="h-3.5 w-3.5" /> PDF (coming soon)
                 </Button>
               </div>
             </div>
             <div className="px-5 py-8 text-center text-sm text-muted-foreground">
-              No reports generated yet. Reports will appear here once campaigns
-              are completed.
+              Choose a report above and click Export CSV. Saved/scheduled
+              report history is coming soon.
             </div>
           </div>
         </TabsContent>

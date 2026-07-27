@@ -1,9 +1,18 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import PageHeader from "../../components/shared/PageHeader";
 import DataTable from "../../components/shared/DataTable";
 import StatusBadge from "../../components/shared/StatusBadge";
@@ -37,6 +46,15 @@ export default function TrainingContent() {
         .then((r) => r.data),
     staleTime: 30_000,
   });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ["departments"],
+    queryFn: () => api.get("/settings/departments").then((r) => r.data),
+    staleTime: 60_000,
+  });
+
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [incompleteOnly, setIncompleteOnly] = useState(false);
 
   const deleteContent = useMutation({
     mutationFn: (id) => api.delete(`/training/${id}`),
@@ -133,13 +151,6 @@ export default function TrainingContent() {
       ),
     },
     {
-      header: "Time Limit",
-      accessor: "timeLimitMinutes",
-      render: (row) => (
-        <span className="text-muted-foreground">{row.timeLimitMinutes ?? 30} min</span>
-      ),
-    },
-    {
       header: "Pass %",
       accessor: "passPercentage",
       render: (row) => (
@@ -187,6 +198,15 @@ export default function TrainingContent() {
       ),
     },
     {
+      header: "Department",
+      accessor: "department",
+      render: (row) => (
+        <span className="text-muted-foreground">
+          {row.userId?.department || "—"}
+        </span>
+      ),
+    },
+    {
       header: "Content",
       accessor: "trainingContentId",
       render: (row) => <span>{row.trainingContentId?.title ?? "—"}</span>,
@@ -202,6 +222,18 @@ export default function TrainingContent() {
       render: (row) => <span>{row.score != null ? `${row.score}%` : "—"}</span>,
     },
   ];
+
+  const filteredRecords = useMemo(
+    () =>
+      records.filter((r) => {
+        if (deptFilter !== "all" && r.userId?.department !== deptFilter) {
+          return false;
+        }
+        if (incompleteOnly && r.status !== "Pending") return false;
+        return true;
+      }),
+    [records, deptFilter, incompleteOnly],
+  );
 
   const isDeleting = deleteContent.isPending || deleteQuiz.isPending;
 
@@ -265,10 +297,39 @@ export default function TrainingContent() {
           />
         </TabsContent>
 
-        <TabsContent value="records">
+        <TabsContent value="records" className="space-y-3">
+          <div className="flex flex-wrap items-center gap-4 bg-card border border-border rounded-xl px-4 py-3">
+            <div className="flex items-center gap-2">
+              <Label className="text-xs text-muted-foreground shrink-0">
+                Department
+              </Label>
+              <Select value={deptFilter} onValueChange={setDeptFilter}>
+                <SelectTrigger className="bg-secondary border-0 h-8 text-xs w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All departments</SelectItem>
+                  {departments.map((d) => (
+                    <SelectItem key={d._id} value={d.name}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <Switch
+                checked={incompleteOnly}
+                onCheckedChange={setIncompleteOnly}
+              />
+              <span className="text-xs text-muted-foreground">
+                Incomplete only
+              </span>
+            </label>
+          </div>
           <DataTable
             columns={recordColumns}
-            data={records}
+            data={filteredRecords}
             isLoading={recordLoading}
             searchPlaceholder="Search records..."
           />
