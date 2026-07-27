@@ -137,7 +137,7 @@ export default function CreateEditLandingPage() {
             </Label>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground whitespace-nowrap">
-                sim.phishguard.io/
+                sim.jambarr360.io/
               </span>
               {isEdit && loadingPage ? (
                 <Skeleton className="h-9 flex-1 rounded-lg" />

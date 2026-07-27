@@ -1053,7 +1053,7 @@ function DomainTab({ settings, isLoading, onSave, isPending }) {
               className="bg-secondary border-0"
             />
           )}
-          <span className="text-sm text-muted-foreground">.phishguard.io</span>
+          <span className="text-sm text-muted-foreground">.jambarr360.io</span>
         </div>
       </div>
       <div className="space-y-2">

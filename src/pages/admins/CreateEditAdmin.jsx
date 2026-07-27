@@ -135,7 +135,7 @@ export default function CreateEditAdmin() {
             ) : (
               <Input
                 type="email"
-                placeholder="jane@phishguard.io"
+                placeholder="jane@jambarr360.io"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="bg-secondary border-0"
