@@ -287,7 +287,16 @@ export default function TrainingContent() {
           />
         </TabsContent>
 
-        <TabsContent value="quizzes">
+        <TabsContent value="quizzes" className="space-y-3">
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={() => navigate("/training/quizzes/create")}
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" /> New Quiz
+            </Button>
+          </div>
           <DataTable
             columns={quizColumns}
             data={quizzes}

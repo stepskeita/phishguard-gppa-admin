@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -50,7 +51,8 @@ export default function QuizManagement() {
           id: q._id ?? Date.now(),
           text: q.text ?? "",
           options: q.options ?? ["", "", "", ""],
-          correct: q.correctOptionIndex ?? 0,
+          questionType: q.questionType ?? "single",
+          correct: q.correctOptionIndices ?? [0],
         })),
       );
     }
@@ -123,15 +125,24 @@ export default function QuizManagement() {
         toast.error("Each question must have between 2 and 6 options");
         return;
       }
+      if (q.correct.length === 0) {
+        toast.error("Every question needs at least one correct answer marked");
+        return;
+      }
+      if (q.questionType === "single" && q.correct.length !== 1) {
+        toast.error("Single-choice questions must have exactly one correct answer");
+        return;
+      }
     }
     const payload = {
       title: quizTitle.trim(),
       maxAttempts,
       passPercentage,
-      questions: questions.map(({ text, options, correct }) => ({
+      questions: questions.map(({ text, options, questionType, correct }) => ({
         text,
         options,
-        correctOptionIndex: correct,
+        questionType,
+        correctOptionIndices: correct,
       })),
     };
     isEdit ? updateMutation.mutate(payload) : createMutation.mutate(payload);
@@ -140,13 +151,13 @@ export default function QuizManagement() {
   const addQuestion = () => {
     setQuestions([
       ...questions,
-      { id: Date.now(), text: "", options: ["", "", "", ""], correct: 0 },
+      { id: Date.now(), text: "", options: ["", "", "", ""], questionType: "single", correct: [0] },
     ]);
   };
   const addTrueFalseQuestion = () => {
     setQuestions([
       ...questions,
-      { id: Date.now(), text: "", options: ["True", "False"], correct: 0 },
+      { id: Date.now(), text: "", options: ["True", "False"], questionType: "single", correct: [0] },
     ]);
   };
   const insertFromBank = (bankQuestion) => {
@@ -156,7 +167,8 @@ export default function QuizManagement() {
         id: Date.now(),
         text: bankQuestion.text,
         options: bankQuestion.options,
-        correct: bankQuestion.correctOptionIndex,
+        questionType: bankQuestion.questionType ?? "single",
+        correct: bankQuestion.correctOptionIndices ?? [],
       },
     ]);
     toast.success("Question inserted");
@@ -169,7 +181,8 @@ export default function QuizManagement() {
     saveToBankMutation.mutate({
       text: q.text,
       options: q.options,
-      correctOptionIndex: q.correct,
+      questionType: q.questionType,
+      correctOptionIndices: q.correct,
     });
   };
   const removeQuestion = (qId) =>
@@ -184,9 +197,25 @@ export default function QuizManagement() {
           : q,
       ),
     );
-  const setCorrect = (qId, oi) =>
+  const toggleCorrect = (qId, oi) =>
     setQuestions(
-      questions.map((q) => (q.id === qId ? { ...q, correct: oi } : q)),
+      questions.map((q) => {
+        if (q.id !== qId) return q;
+        if (q.questionType === "single") return { ...q, correct: [oi] };
+        const correct = q.correct.includes(oi)
+          ? q.correct.filter((i) => i !== oi)
+          : [...q.correct, oi].sort((a, b) => a - b);
+        return { ...q, correct };
+      }),
+    );
+  const setQuestionType = (qId, questionType) =>
+    setQuestions(
+      questions.map((q) => {
+        if (q.id !== qId) return q;
+        const correct =
+          questionType === "single" ? [q.correct[0] ?? 0] : q.correct;
+        return { ...q, questionType, correct };
+      }),
     );
   const addOption = (qId) =>
     setQuestions(
@@ -201,9 +230,8 @@ export default function QuizManagement() {
       questions.map((q) => {
         if (q.id !== qId || q.options.length <= 2) return q;
         const options = q.options.filter((_, i) => i !== oi);
-        let correct = q.correct;
-        if (oi === q.correct) correct = 0;
-        else if (oi < q.correct) correct = q.correct - 1;
+        let correct = q.correct.filter((i) => i !== oi).map((i) => (i > oi ? i - 1 : i));
+        if (correct.length === 0) correct = [0];
         return { ...q, options, correct };
       }),
     );
@@ -327,45 +355,105 @@ export default function QuizManagement() {
                 placeholder="Enter question..."
                 className="bg-secondary border-0"
               />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={q.questionType === "single" ? "default" : "outline"}
+                  className="h-7 text-xs"
+                  onClick={() => setQuestionType(q.id, "single")}
+                >
+                  Single Choice
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={q.questionType === "multiple" ? "default" : "outline"}
+                  className="h-7 text-xs"
+                  onClick={() => setQuestionType(q.id, "multiple")}
+                >
+                  Multiple Choice
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Select the correct answer:
+                {q.questionType === "multiple"
+                  ? "Check all correct answers:"
+                  : "Select the correct answer:"}
               </p>
-              <RadioGroup
-                value={String(q.correct)}
-                onValueChange={(v) => setCorrect(q.id, Number(v))}
-                className="space-y-2"
-              >
-                {q.options.map((opt, oi) => (
-                  <label
-                    key={oi}
-                    className={`flex items-center gap-3 p-2.5 rounded-lg border transition-colors cursor-pointer ${
-                      q.correct === oi
-                        ? "border-primary/50 bg-primary/5"
-                        : "border-border hover:border-primary/30"
-                    }`}
-                  >
-                    <RadioGroupItem value={String(oi)} />
-                    <Input
-                      value={opt}
-                      onChange={(e) => updateOption(q.id, oi, e.target.value)}
-                      placeholder={`Option ${oi + 1}`}
-                      className="bg-transparent border-0 p-0 h-auto focus-visible:ring-0"
-                    />
-                    {q.options.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          removeOption(q.id, oi);
-                        }}
-                        className="text-muted-foreground hover:text-destructive shrink-0"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </label>
-                ))}
-              </RadioGroup>
+              {q.questionType === "single" ? (
+                <RadioGroup
+                  value={String(q.correct[0] ?? 0)}
+                  onValueChange={(v) => toggleCorrect(q.id, Number(v))}
+                  className="space-y-2"
+                >
+                  {q.options.map((opt, oi) => (
+                    <label
+                      key={oi}
+                      className={`flex items-center gap-3 p-2.5 rounded-lg border transition-colors cursor-pointer ${
+                        q.correct.includes(oi)
+                          ? "border-primary/50 bg-primary/5"
+                          : "border-border hover:border-primary/30"
+                      }`}
+                    >
+                      <RadioGroupItem value={String(oi)} />
+                      <Input
+                        value={opt}
+                        onChange={(e) => updateOption(q.id, oi, e.target.value)}
+                        placeholder={`Option ${oi + 1}`}
+                        className="bg-transparent border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                      {q.options.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            removeOption(q.id, oi);
+                          }}
+                          className="text-muted-foreground hover:text-destructive shrink-0"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </label>
+                  ))}
+                </RadioGroup>
+              ) : (
+                <div className="space-y-2">
+                  {q.options.map((opt, oi) => (
+                    <label
+                      key={oi}
+                      className={`flex items-center gap-3 p-2.5 rounded-lg border transition-colors cursor-pointer ${
+                        q.correct.includes(oi)
+                          ? "border-primary/50 bg-primary/5"
+                          : "border-border hover:border-primary/30"
+                      }`}
+                    >
+                      <Checkbox
+                        checked={q.correct.includes(oi)}
+                        onCheckedChange={() => toggleCorrect(q.id, oi)}
+                      />
+                      <Input
+                        value={opt}
+                        onChange={(e) => updateOption(q.id, oi, e.target.value)}
+                        placeholder={`Option ${oi + 1}`}
+                        className="bg-transparent border-0 p-0 h-auto focus-visible:ring-0"
+                      />
+                      {q.options.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            removeOption(q.id, oi);
+                          }}
+                          className="text-muted-foreground hover:text-destructive shrink-0"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
               {q.options.length < 6 && (
                 <Button
                   variant="ghost"
