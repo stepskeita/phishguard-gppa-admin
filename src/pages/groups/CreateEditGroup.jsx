@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Search, X, Users, CheckSquare } from "lucide-react";
+import { Search, X, Users, CheckSquare, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,14 +26,23 @@ export default function CreateEditGroup() {
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
 
-  // Load all users
+  // Load all users. The server caps `limit` at 1000; asking for more than it
+  // will give used to fail silently, showing only the newest 100 users with no
+  // sign that the rest existed — so anyone below the cut simply could not be
+  // added to a group, and never received a campaign. Compare against `total`
+  // and say so out loud rather than quietly presenting a partial roster.
+  const USER_FETCH_LIMIT = 1000;
   const { data: usersRes, isLoading: usersLoading } = useQuery({
     queryKey: ["users-all"],
     queryFn: () =>
-      api.get("/users", { params: { limit: 500 } }).then((r) => r.data),
+      api
+        .get("/users", { params: { limit: USER_FETCH_LIMIT } })
+        .then((r) => r.data),
     staleTime: 60_000,
   });
   const allUsers = useMemo(() => usersRes?.data ?? [], [usersRes]);
+  const totalUsers = usersRes?.total ?? 0;
+  const isTruncated = totalUsers > allUsers.length;
 
   // Load departments
   const { data: departments = [] } = useQuery({
@@ -242,6 +251,17 @@ export default function CreateEditGroup() {
                 ))}
               </select>
             </div>
+
+            {isTruncated && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>
+                  Showing {allUsers.length} of {totalUsers} users — the rest
+                  can&apos;t be selected here. Add them by importing a file
+                  directly into this group, or from each user&apos;s own page.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* User list */}

@@ -1,7 +1,9 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Upload, FileSpreadsheet, X, AlertCircle, CheckCircle2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import PageHeader from "../../components/shared/PageHeader";
 import api from "@/api/axios";
 
@@ -43,6 +45,16 @@ export default function BulkImport() {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingImport, setLoadingImport] = useState(false);
   const [fileError, setFileError] = useState("");
+  const [groupId, setGroupId] = useState("");
+
+  // Imported users land in no group unless one is chosen here, and a user in
+  // no group is unreachable by every campaign.
+  const { data: groupsRes } = useQuery({
+    queryKey: ["groups-all"],
+    queryFn: () => api.get("/groups", { params: { limit: 100 } }).then((r) => r.data),
+    staleTime: 60_000,
+  });
+  const groups = groupsRes?.data ?? [];
 
   async function handleFile(/** @type {File | undefined | null} */ selected) {
     if (!selected) return;
@@ -77,6 +89,7 @@ export default function BulkImport() {
     if (!file) return;
     const form = new FormData();
     form.append("file", file);
+    if (groupId) form.append("groupId", groupId);
     setLoadingImport(true);
     try {
       const res = await api.post("/users/import", form);
@@ -96,6 +109,7 @@ export default function BulkImport() {
     setPreview(null);
     setResult(null);
     setFileError("");
+    setGroupId("");
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -128,6 +142,8 @@ export default function BulkImport() {
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {result.imported} user{result.imported !== 1 ? "s" : ""} imported
                   {result.skipped > 0 && `, ${result.skipped} skipped (duplicates)`}.
+                  {result.addedToGroup > 0 &&
+                    ` ${result.addedToGroup} added to the selected group.`}
                 </p>
               </div>
             </div>
@@ -292,6 +308,28 @@ export default function BulkImport() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+
+                {/* Target group */}
+                <div className="bg-card border border-border rounded-xl p-5 space-y-2">
+                  <Label>Add to group</Label>
+                  <select
+                    className="h-9 w-full rounded-md bg-secondary border-0 text-sm px-2 text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring"
+                    value={groupId}
+                    onChange={(e) => setGroupId(e.target.value)}
+                  >
+                    <option value="">No group</option>
+                    {groups.map((g) => (
+                      <option key={g._id} value={g._id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-muted-foreground">
+                    Campaigns are sent to groups, so users imported without one
+                    won&apos;t receive anything until they&apos;re added to a
+                    group. Rows that already exist are added to the group too.
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-3">
