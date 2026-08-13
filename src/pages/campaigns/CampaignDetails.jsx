@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -14,9 +15,18 @@ import {
   Copy,
   FlaskConical,
   Repeat,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import PageHeader from "../../components/shared/PageHeader";
 import StatusBadge from "../../components/shared/StatusBadge";
 import KpiCard from "../../components/shared/KpiCard";
@@ -70,16 +80,93 @@ export default function CampaignDetails() {
       (a, b) => (a.recurrence?.occurrencesRun ?? 0) - (b.recurrence?.occurrencesRun ?? 0),
     );
 
+  // Set when the server reports the template's attachment files are gone from
+  // disk (409). Holds the list so the confirm dialog can name them.
+  const [missingAttachments, setMissingAttachments] = useState(null);
+  // Which request the attachment prompt should retry once answered, since
+  // both launch and resend can raise it.
+  const [pendingSend, setPendingSend] = useState(null);
+  const [resendOpen, setResendOpen] = useState(false);
+  const [resendAudience, setResendAudience] = useState("failed");
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+
   const launchMutation = useMutation({
-    mutationFn: () => api.post(`/campaigns/${id}/launch`),
+    // attachmentPolicy is omitted on the first attempt so the server asks;
+    // 'skip' sends without the missing files, 'proceed' sends as configured.
+    mutationFn: (attachmentPolicy) =>
+      api.post(
+        `/campaigns/${id}/launch`,
+        attachmentPolicy ? { attachmentPolicy } : {},
+      ),
     onSuccess: () => {
+      setMissingAttachments(null);
+      setPendingSend(null);
       queryClient.invalidateQueries({ queryKey: ["campaign", id] });
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       toast.success("Campaign launched successfully");
     },
-    onError: (err) =>
-      toast.error(err.response?.data?.error ?? "Failed to launch campaign"),
+    onError: (err) => {
+      if (err.response?.data?.code === "MISSING_ATTACHMENTS") {
+        setPendingSend({ kind: "launch" });
+        setMissingAttachments(err.response.data.missingAttachments ?? []);
+        return;
+      }
+      toast.error(err.response?.data?.error ?? "Failed to launch campaign");
+    },
   });
+
+  const resendMutation = useMutation({
+    mutationFn: ({ audience, userIds, attachmentPolicy }) =>
+      api.post(`/campaigns/${id}/resend`, {
+        audience,
+        ...(userIds?.length ? { userIds } : {}),
+        ...(attachmentPolicy ? { attachmentPolicy } : {}),
+      }),
+    onSuccess: (res) => {
+      const { emailsDispatched, recipientsTargeted } = res.data;
+      setMissingAttachments(null);
+      setPendingSend(null);
+      setResendOpen(false);
+      setSelectedUserIds([]);
+      queryClient.invalidateQueries({ queryKey: ["campaign", id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-stats", id] });
+      queryClient.invalidateQueries({ queryKey: ["campaign-user-activity", id] });
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+
+      if (emailsDispatched === recipientsTargeted) {
+        toast.success(`Resent to ${emailsDispatched} recipient(s)`);
+      } else {
+        toast.warning(
+          `Resent to ${emailsDispatched} of ${recipientsTargeted} — ${
+            recipientsTargeted - emailsDispatched
+          } still failing. Check Send Status below.`,
+        );
+      }
+    },
+    onError: (err) => {
+      if (err.response?.data?.code === "MISSING_ATTACHMENTS") {
+        setPendingSend({
+          kind: "resend",
+          audience: resendAudience,
+          userIds: selectedUserIds,
+        });
+        setMissingAttachments(err.response.data.missingAttachments ?? []);
+        return;
+      }
+      toast.error(err.response?.data?.error ?? "Failed to resend campaign");
+    },
+  });
+
+  // Re-issue whichever request hit the missing-attachment prompt, now that
+  // the admin has answered it.
+  const retryWithPolicy = (attachmentPolicy) => {
+    setMissingAttachments(null);
+    if (pendingSend?.kind === "resend") {
+      resendMutation.mutate({ ...pendingSend, attachmentPolicy });
+    } else {
+      launchMutation.mutate(attachmentPolicy);
+    }
+  };
 
   // Revert a Scheduled campaign back to Draft (cancel the schedule)
   const cancelScheduleMutation = useMutation({
@@ -105,6 +192,20 @@ export default function CampaignDetails() {
   });
 
   const targetUsers = activityData?.data ?? [];
+
+  const failedCount = targetUsers.filter((u) => u.sendStatus === "Failed").length;
+  const unsentCount = targetUsers.filter((u) => u.sendStatus !== "Sent").length;
+  const canResend = !!campaign?.launchedAt;
+
+  const toggleSelected = (userId) =>
+    setSelectedUserIds((prev) =>
+      prev.includes(userId)
+        ? prev.filter((x) => x !== userId)
+        : [...prev, userId],
+    );
+
+  const resendCounts = { all: targetUsers.length, failed: failedCount, unsent: unsentCount, selected: selectedUserIds.length };
+  const resendDisabled = resendCounts[resendAudience] === 0;
 
   if (loadingCampaign) {
     return (
@@ -180,9 +281,49 @@ export default function CampaignDetails() {
                   </Button>
                 </>
               )}
+            {canResend && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  // Default to whichever audience there's actually something
+                  // to do for, so the common "retry the failures" case is
+                  // one click and the dialog never opens on an empty set.
+                  setResendAudience(
+                    failedCount > 0 ? "failed" : unsentCount > 0 ? "unsent" : "all",
+                  );
+                  setResendOpen(true);
+                }}
+                disabled={resendMutation.isPending}
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                {resendMutation.isPending ? "Resending…" : "Resend"}
+              </Button>
+            )}
           </div>
         }
       />
+
+      {/* Failed-send banner — the fastest route back to a working campaign */}
+      {canResend && failedCount > 0 && (
+        <div className="mb-6 flex items-center gap-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl px-4 py-3">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span className="flex-1">
+            {failedCount} recipient{failedCount === 1 ? "" : "s"} did not receive
+            this campaign
+            {campaign.stats?.lastError ? ` — ${campaign.stats.lastError}` : ""}.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setResendAudience("failed");
+              setResendOpen(true);
+            }}
+          >
+            Retry failed
+          </Button>
+        </div>
+      )}
 
       {/* Scheduled banner */}
       {campaign.status === "Scheduled" && campaign.startDate && (
@@ -453,8 +594,26 @@ export default function CampaignDetails() {
 
         {/* Target Users */}
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
             <h3 className="text-sm font-semibold">User Activity</h3>
+            {selectedUserIds.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {selectedUserIds.length} selected
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setResendAudience("selected");
+                    setResendOpen(true);
+                  }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  Resend to selected
+                </Button>
+              </div>
+            )}
           </div>
           {targetUsers.length === 0 ? (
             <div className="px-5 py-8 text-center text-sm text-muted-foreground">
@@ -464,6 +623,28 @@ export default function CampaignDetails() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
+                  {canResend && (
+                    <th className="pl-5 pr-0 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 cursor-pointer accent-primary"
+                        aria-label="Select all recipients"
+                        checked={
+                          selectedUserIds.length > 0 &&
+                          selectedUserIds.length === targetUsers.length
+                        }
+                        onChange={(e) =>
+                          setSelectedUserIds(
+                            e.target.checked
+                              ? targetUsers
+                                  .map((u) => u.userId?._id)
+                                  .filter(Boolean)
+                              : [],
+                          )
+                        }
+                      />
+                    </th>
+                  )}
                   <th className="px-5 py-3 text-left text-xs font-semibold text-muted-foreground uppercase">
                     Name
                   </th>
@@ -488,6 +669,23 @@ export default function CampaignDetails() {
                     className="border-b border-border/50 last:border-0 cursor-pointer hover:bg-secondary/50"
                     onClick={() => navigate(`/users/${log.userId?._id}`)}
                   >
+                    {canResend && (
+                      // Stops the row's navigate-to-user handler, so ticking a
+                      // box selects instead of leaving the page.
+                      <td
+                        className="pl-5 pr-0 py-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 cursor-pointer accent-primary"
+                          aria-label={`Select ${log.userId?.email ?? "recipient"}`}
+                          disabled={!log.userId?._id}
+                          checked={selectedUserIds.includes(log.userId?._id)}
+                          onChange={() => toggleSelected(log.userId?._id)}
+                        />
+                      </td>
+                    )}
                     <td className="px-5 py-3 text-sm font-medium">
                       {log.userId
                         ? `${log.userId.firstName} ${log.userId.lastName}`
@@ -534,6 +732,157 @@ export default function CampaignDetails() {
           )}
         </div>
       </div>
+
+      <Dialog open={resendOpen} onOpenChange={setResendOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Resend campaign
+            </DialogTitle>
+            <DialogDescription>
+              Sends the same template again. Recipients keep one send record
+              each, so this updates their status rather than double-counting
+              them.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1">
+            {[
+              {
+                value: "failed",
+                label: "Only failed recipients",
+                hint: "Retry the ones that errored — the usual fix after correcting SMTP settings.",
+              },
+              {
+                value: "unsent",
+                label: "Everyone not yet delivered",
+                hint: "Failed recipients plus anyone never attempted.",
+              },
+              {
+                value: "selected",
+                label: "Selected recipients",
+                hint: "Tick people in the table below to choose them.",
+              },
+              {
+                value: "all",
+                label: "Everyone in the target groups",
+                hint: "Including people who already received it.",
+              },
+            ].map((opt) => (
+              <label
+                key={opt.value}
+                className={cn(
+                  "flex gap-3 rounded-lg border p-3 cursor-pointer",
+                  resendAudience === opt.value
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-secondary/50",
+                  resendCounts[opt.value] === 0 && "opacity-50",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="resend-audience"
+                  className="mt-0.5 accent-primary"
+                  value={opt.value}
+                  checked={resendAudience === opt.value}
+                  onChange={() => setResendAudience(opt.value)}
+                />
+                <span className="flex-1">
+                  <span className="flex items-center justify-between text-sm font-medium">
+                    {opt.label}
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {resendCounts[opt.value]}
+                    </span>
+                  </span>
+                  <span className="block text-xs text-muted-foreground mt-0.5">
+                    {opt.hint}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+
+          {campaign.remediationTrainingIds?.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Remediation training stays attached — recipients are enrolled when
+              they click, and anyone already enrolled keeps their existing
+              progress.
+            </p>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setResendOpen(false)}
+              disabled={resendMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                resendMutation.mutate({
+                  audience: resendAudience,
+                  userIds: selectedUserIds,
+                })
+              }
+              disabled={resendMutation.isPending || resendDisabled}
+            >
+              {resendMutation.isPending
+                ? "Resending…"
+                : `Resend to ${resendCounts[resendAudience]}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!missingAttachments}
+        onOpenChange={(open) => !open && setMissingAttachments(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Missing attachments
+            </DialogTitle>
+            <DialogDescription>
+              These files are no longer on the server, so they can't be sent.
+              Uploads don't survive a redeploy — re-upload them on the template
+              if the campaign depends on them.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ul className="rounded-md border bg-muted/40 px-3 py-2 text-sm space-y-1">
+            {(missingAttachments ?? []).map((att, i) => (
+              <li key={i} className="flex flex-col">
+                <span className="font-medium">{att.filename}</span>
+                <span className="text-xs text-muted-foreground">
+                  {att.template}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setMissingAttachments(null)}
+              disabled={launchMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => retryWithPolicy("skip")}
+              disabled={launchMutation.isPending || resendMutation.isPending}
+            >
+              {launchMutation.isPending || resendMutation.isPending
+                ? "Sending…"
+                : "Send without attachments"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

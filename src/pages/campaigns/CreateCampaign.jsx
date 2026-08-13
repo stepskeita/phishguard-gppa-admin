@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Users, Lock, FlaskConical } from "lucide-react";
+import { Check, Users, Lock, FlaskConical, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import PageHeader from "../../components/shared/PageHeader";
@@ -179,16 +187,29 @@ export default function CreateCampaign() {
       toast.error(err.response?.data?.error ?? "Failed to create campaign"),
   });
 
+  // Set when the server asks to confirm editing an already-sent campaign
+  // (409). Holds the field labels it flagged, plus the payload to resubmit.
+  const [postLaunchEdit, setPostLaunchEdit] = useState(null);
+
   const updateMutation = useMutation({
     mutationFn: (body) => api.put(`/campaigns/${id}`, body),
     onSuccess: () => {
+      setPostLaunchEdit(null);
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       queryClient.invalidateQueries({ queryKey: ["campaign", id] });
       toast.success("Campaign updated");
       navigate(`/campaigns/${id}`);
     },
-    onError: (err) =>
-      toast.error(err.response?.data?.error ?? "Failed to update campaign"),
+    onError: (err, body) => {
+      if (err.response?.data?.code === "POST_LAUNCH_EDIT") {
+        setPostLaunchEdit({
+          changedFields: err.response.data.changedFields ?? [],
+          body,
+        });
+        return;
+      }
+      toast.error(err.response?.data?.error ?? "Failed to update campaign");
+    },
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;
@@ -276,19 +297,6 @@ export default function CreateCampaign() {
       payload.startDate = buildDateTime(form.startDate, form.startTime);
     }
 
-    // Once launched, the attack-config fields are server-locked — omit them
-    // entirely rather than resend unchanged values that could theoretically
-    // fail the backend's equality check (e.g. array re-ordering).
-    if (fieldsLocked) {
-      delete payload.targetGroupIds;
-      delete payload.emailTemplateId;
-      delete payload.abTestTemplateIds;
-      delete payload.landingPageId;
-      delete payload.remediationTrainingIds;
-      delete payload.smtpConfigId;
-      delete payload.sendingDomainId;
-      delete payload.startDate;
-    }
     return payload;
   };
 
@@ -345,12 +353,11 @@ export default function CreateCampaign() {
 
   const isPageLoading = isEdit && campaignLoading;
 
-  // Once a campaign has launched, its "attack config" (who/what/how it was
-  // sent) is locked server-side (see campaignController.js's
-  // LOCKED_AFTER_LAUNCH_FIELDS) — mirror that here so the UI doesn't let an
-  // admin build a change the API will just reject.
-  const fieldsLocked = isEdit && Boolean(existingCampaign?.launchedAt);
-  const lockedClass = fieldsLocked ? "pointer-events-none opacity-50" : "";
+  // A launched campaign's "attack config" (who/what/how it was sent) stays
+  // editable — fixing a broken template or SMTP config and resending is a
+  // normal workflow — but the server asks for confirmation first, since the
+  // recorded stats then describe an older version of the campaign.
+  const hasLaunched = isEdit && Boolean(existingCampaign?.launchedAt);
 
   return (
     <div>
@@ -403,14 +410,15 @@ export default function CreateCampaign() {
           </div>
         ))}
       </div>
-      {fieldsLocked && (
+      {hasLaunched && (
         <div className="mb-4 max-w-5xl flex items-center gap-3 bg-secondary border border-border text-sm rounded-xl px-4 py-3">
           <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="text-muted-foreground">
-            This campaign has already launched — targeting, template, landing
-            page, remediation training, start date, and sending config are
-            locked. Name, description, end date, and status can still be
-            changed.
+            This campaign has already been sent. You can still change its
+            targeting, template, landing page, training and sending config —
+            you'll be asked to confirm, since the recorded stats describe what
+            was sent before the change. Use Resend afterwards to deliver the
+            updated version.
           </span>
         </div>
       )}
@@ -500,7 +508,7 @@ export default function CreateCampaign() {
                   </button>
                 </div>
               ) : (
-                <div className={cn("space-y-3", lockedClass)}>
+                <div className="space-y-3">
                 {groups.map((g) => {
                   const selected = form.targetGroupIds.includes(g._id);
                   return (
@@ -555,7 +563,6 @@ export default function CreateCampaign() {
                   <label
                     className={cn(
                       "flex items-center gap-2 cursor-pointer",
-                      lockedClass,
                     )}
                   >
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -597,7 +604,7 @@ export default function CreateCampaign() {
                     </button>
                   </div>
                 ) : (
-                  <div className={cn("space-y-2", lockedClass)}>
+                  <div className="space-y-2">
                     {templates.map((t) => {
                       const sel = form.abTestEnabled
                         ? form.abTestTemplateIds.includes(t._id)
@@ -718,7 +725,6 @@ export default function CreateCampaign() {
                   <Select
                     value={form.landingPageId}
                     onValueChange={set("landingPageId")}
-                    disabled={fieldsLocked}
                   >
                     <SelectTrigger className="bg-secondary border-0">
                       <SelectValue placeholder="Choose a landing page" />
@@ -816,7 +822,7 @@ export default function CreateCampaign() {
                   </button>
                 </div>
               ) : (
-                <div className={cn("space-y-3", lockedClass)}>
+                <div className="space-y-3">
                 {trainingContent.map((t) => {
                   const selected = form.remediationTrainingIds.includes(
                     t._id,
@@ -902,7 +908,6 @@ export default function CreateCampaign() {
                       className="bg-secondary border-0 cursor-pointer text-foreground [color-scheme:light] dark:[color-scheme:dark] w-full"
                       value={form.startDate}
                       onChange={set("startDate")}
-                      disabled={fieldsLocked}
                     />
                   </div>
                   <div
@@ -916,7 +921,6 @@ export default function CreateCampaign() {
                       className="bg-secondary border-0 cursor-pointer text-foreground [color-scheme:light] dark:[color-scheme:dark] w-full"
                       value={form.startTime}
                       onChange={set("startTime")}
-                      disabled={fieldsLocked}
                     />
                   </div>
                 </div>
@@ -1060,7 +1064,7 @@ export default function CreateCampaign() {
                     </button>
                   </div>
                 ) : (
-                  <div className={cn("space-y-2", lockedClass)}>
+                  <div className="space-y-2">
                     <label
                       onClick={() => set("smtpConfigId")("")}
                       className={cn(
@@ -1154,7 +1158,7 @@ export default function CreateCampaign() {
                     </button>
                   </div>
                 ) : (
-                  <div className={cn("space-y-2", lockedClass)}>
+                  <div className="space-y-2">
                     <label
                       onClick={() => set("sendingDomainId")("")}
                       className={cn(
@@ -1394,6 +1398,61 @@ export default function CreateCampaign() {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={!!postLaunchEdit}
+        onOpenChange={(open) => !open && setPostLaunchEdit(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              This campaign has already been sent
+            </DialogTitle>
+            <DialogDescription>
+              You're changing what was sent, so the stats and tracking history
+              already recorded will describe the older version. Recipients who
+              already got the original keep their results.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase">
+              Changing
+            </p>
+            <ul className="rounded-md border bg-muted/40 px-3 py-2 text-sm space-y-1">
+              {(postLaunchEdit?.changedFields ?? []).map((field) => (
+                <li key={field}>{field}</li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              Saving does not send anything. Use Resend on the campaign page to
+              deliver the updated version.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setPostLaunchEdit(null)}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                updateMutation.mutate({
+                  ...postLaunchEdit.body,
+                  confirmPostLaunchEdit: true,
+                })
+              }
+              disabled={isPending}
+            >
+              {isPending ? "Saving…" : "Save changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
