@@ -2,7 +2,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { API_CONFIG } from "@/lib/environment";
 
-const TOKEN_KEY = "phish-guard-token";
+const TOKEN_KEY = "jambarr-360-token";
 
 const api = axios.create(API_CONFIG);
 

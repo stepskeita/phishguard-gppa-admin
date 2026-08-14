@@ -65,7 +65,10 @@ export default function CreateUser() {
   const handleSubmit = (e) => {
     e.preventDefault();
     const payload = { ...form };
-    if (form.groupId) payload.groupIds = [form.groupId];
+    // "none" is the dropdown's sentinel for no group, not an id — sending it
+    // through as one casts to ObjectId server-side and fails the whole create.
+    payload.groupIds =
+      form.groupId && form.groupId !== "none" ? [form.groupId] : [];
     delete payload.groupId;
     mutation.mutate(payload);
   };

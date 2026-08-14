@@ -3,11 +3,11 @@
  * Centralized configuration for API endpoints.
  */
 
-const isDev = true;
+const isDev = false;
 
 export const BACKEND_BASE_URL = isDev
-  ? "http://localhost:5000"
-  : "https://phishguard-backend-i2w6.onrender.com";
+  ? "http://localhost:5001"
+  : "https://api.jambarr360.me";
 
 export const BACKEND_API_URL = `${BACKEND_BASE_URL}/api`;
 
