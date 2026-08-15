@@ -112,7 +112,11 @@ const AuthenticatedApp = () => {
 
 function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" storageKey="phish-guard-theme">
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="dark"
+      storageKey="jambarr360-theme"
+    >
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
           <Router>
