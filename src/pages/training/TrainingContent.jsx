@@ -38,12 +38,33 @@ export default function TrainingContent() {
     staleTime: 30_000,
   });
 
-  const { data: recordRes, isLoading: recordLoading } = useQuery({
-    queryKey: ["training-records"],
-    queryFn: () =>
-      api
-        .get("/training-records", { params: { limit: 100 } })
-        .then((r) => r.data),
+  // The backend hard-caps each page at 100 records regardless of the limit
+  // requested (Math.min(100, ...) in trainingRecordController.js), so a
+  // single { limit: 100 } fetch silently truncates once an org has more
+  // than 100 training records — this table would then show fewer rows,
+  // and a smaller total in its own "Showing X of Y" footer, than the
+  // Analytics page's Training Funnel "Enrolled" count, which counts every
+  // record server-side with no cap. Looping through every page keeps this
+  // table's data complete and in agreement with that figure. DataTable's
+  // own filtering/pagination is entirely client-side already, so handing
+  // it the full assembled list preserves its existing behavior exactly.
+  const { data: records = [], isLoading: recordLoading } = useQuery({
+    queryKey: ["training-records", "all"],
+    queryFn: async () => {
+      const pageSize = 100;
+      const first = await api
+        .get("/training-records", { params: { page: 1, limit: pageSize } })
+        .then((r) => r.data);
+      const all = [...first.data];
+      const totalPages = Math.ceil(first.total / pageSize);
+      for (let page = 2; page <= totalPages; page += 1) {
+        const next = await api
+          .get("/training-records", { params: { page, limit: pageSize } })
+          .then((r) => r.data);
+        all.push(...next.data);
+      }
+      return all;
+    },
     staleTime: 30_000,
   });
 
@@ -74,7 +95,6 @@ export default function TrainingContent() {
 
   const content = contentRes?.data ?? [];
   const quizzes = quizRes?.data ?? [];
-  const records = recordRes?.data ?? [];
 
   const contentColumns = [
     {
