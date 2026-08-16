@@ -23,9 +23,16 @@ export default function AppLayout() {
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
       </div>
 
-      {/* Sidebar - mobile */}
+      {/* Sidebar - mobile. Needs an explicit width: this wrapper is
+          position:fixed with no `right`, and its only child (Sidebar's
+          <aside>) is *also* fixed — so it contributes nothing to the
+          wrapper's shrink-to-fit sizing, collapsing it to 0 width. At
+          width:0, `-translate-x-full` (-100%, relative to the element's
+          OWN width) resolves to translateX(0) — a no-op — so the drawer
+          never actually slid off-screen; w-60 matches Sidebar's own width
+          when expanded (which this always renders as, collapsed={false}). */}
       <div className={cn(
-        "lg:hidden fixed inset-y-0 left-0 z-40 transition-transform duration-300",
+        "lg:hidden fixed inset-y-0 left-0 z-40 w-60 transition-transform duration-300",
         mobileOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} />

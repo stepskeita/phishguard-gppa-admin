@@ -149,6 +149,7 @@ export default function UserProfile() {
                 No training records yet.
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
@@ -216,6 +217,7 @@ export default function UserProfile() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </TabsContent>

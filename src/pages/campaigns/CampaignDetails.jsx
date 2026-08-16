@@ -389,6 +389,10 @@ export default function CampaignDetails() {
             <FlaskConical className="h-4 w-4 text-primary" />
             <h3 className="text-sm font-semibold">A/B Variant Performance</h3>
           </div>
+          {/* overflow-x-auto here (not on the rounded-corner parent, which
+              needs overflow-hidden to clip its own corners) so wide tables
+              scroll horizontally on narrow screens instead of clipping. */}
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
@@ -447,6 +451,7 @@ export default function CampaignDetails() {
                 ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -620,6 +625,7 @@ export default function CampaignDetails() {
               No user activity recorded yet.
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
@@ -729,6 +735,7 @@ export default function CampaignDetails() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>
