@@ -14,9 +14,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 
+// "Jane Doe" -> "JD"; falls back to the first two letters of a single name
+// or the email's local part if fullName is ever missing.
+function getInitials(user) {
+  const source = user?.fullName?.trim() || user?.email || "";
+  const words = source.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return source.slice(0, 2).toUpperCase() || "?";
+}
+
 export default function Topbar({ onMobileMenuToggle }) {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  const roleName = user?.roleId?.name || "No role assigned";
   return (
     <header className="h-16 bg-card/50 backdrop-blur-sm border-b border-border flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
       {/* Left */}
@@ -92,16 +102,23 @@ export default function Topbar({ onMobileMenuToggle }) {
             <Button variant="ghost" className="gap-2 px-2 hover:bg-secondary">
               <Avatar className="h-7 w-7">
                 <AvatarFallback className="bg-primary/20 text-primary text-xs font-semibold">
-                  AD
+                  {getInitials(user)}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm font-medium hidden sm:inline">
-                Admin
+              <span className="text-sm font-medium hidden sm:inline max-w-32 truncate">
+                {user?.fullName || "Account"}
               </span>
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-56">
+            <div className="px-3 py-2.5 border-b border-border">
+              <p className="text-sm font-semibold truncate">{user?.fullName}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+              <Badge variant="secondary" className="mt-1.5 font-normal">
+                {roleName}
+              </Badge>
+            </div>
             <DropdownMenuItem onClick={() => navigate("/settings")}>
               Profile
             </DropdownMenuItem>

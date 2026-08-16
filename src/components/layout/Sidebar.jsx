@@ -1,31 +1,36 @@
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
 import {
   LayoutDashboard, Users, UsersRound, Target, Mail, Globe,
   Link2, BarChart3, GraduationCap, Shield, UserCog, ScrollText,
   Settings, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/AuthContext";
 import logo from "@/assets/logo.png";
 
+// `permission` matches the exact "module:Action" string the backend route
+// enforces for that page (see requirePermission() calls in src/routes on the
+// backend) — a null permission means every authenticated admin can see it.
 const menuItems = [
-  { label: "Dashboard", icon: LayoutDashboard, path: "/" },
-  { label: "Users", icon: Users, path: "/users" },
-  { label: "Groups", icon: UsersRound, path: "/groups" },
-  { label: "Campaigns", icon: Target, path: "/campaigns" },
-  { label: "Templates", icon: Mail, path: "/templates" },
-  { label: "Landing Pages", icon: Globe, path: "/landing-pages" },
-  { label: "Tracking Logs", icon: Link2, path: "/tracking-logs" },
-  { label: "Analytics", icon: BarChart3, path: "/analytics" },
-  { label: "Training", icon: GraduationCap, path: "/training" },
-  { label: "Roles & Permissions", icon: Shield, path: "/roles" },
-  { label: "Admin Management", icon: UserCog, path: "/admins" },
-  { label: "Audit Logs", icon: ScrollText, path: "/audit-logs" },
-  { label: "Settings", icon: Settings, path: "/settings" },
+  { label: "Dashboard", icon: LayoutDashboard, path: "/", permission: null },
+  { label: "Users", icon: Users, path: "/users", permission: "users:View" },
+  { label: "Groups", icon: UsersRound, path: "/groups", permission: "groups:View" },
+  { label: "Campaigns", icon: Target, path: "/campaigns", permission: "campaigns:View" },
+  { label: "Templates", icon: Mail, path: "/templates", permission: "templates:View" },
+  { label: "Landing Pages", icon: Globe, path: "/landing-pages", permission: "landing-pages:View" },
+  { label: "Tracking Logs", icon: Link2, path: "/tracking-logs", permission: "tracking-logs:View" },
+  { label: "Analytics", icon: BarChart3, path: "/analytics", permission: "analytics:View" },
+  { label: "Training", icon: GraduationCap, path: "/training", permission: "training:View" },
+  { label: "Roles & Permissions", icon: Shield, path: "/roles", permission: "settings:Manage Admins" },
+  { label: "Admin Management", icon: UserCog, path: "/admins", permission: "settings:Manage Admins" },
+  { label: "Audit Logs", icon: ScrollText, path: "/audit-logs", permission: "audit-logs:View" },
+  { label: "Settings", icon: Settings, path: "/settings", permission: "settings:View" },
 ];
 
 export default function Sidebar({ collapsed, onToggle }) {
   const location = useLocation();
+  const { hasPermission } = useAuth();
+  const visibleItems = menuItems.filter((item) => hasPermission(item.permission));
 
   const isActive = (path) => {
     if (path === "/") return location.pathname === "/";
@@ -51,7 +56,7 @@ export default function Sidebar({ collapsed, onToggle }) {
 
       {/* Menu */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-        {menuItems.map((item) => {
+        {visibleItems.map((item) => {
           const active = isActive(item.path);
           return (
             <Link

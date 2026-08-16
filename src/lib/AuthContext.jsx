@@ -49,9 +49,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // `user.roleId` arrives populated from the API (an object with a
+  // `permissions` array of "module:Action" strings, e.g. "campaigns:View")
+  // rather than a bare id — see backend authController's `.populate('roleId')`.
+  // A missing/unassigned role means zero permissions, not a crash.
+  const hasPermission = (permission) => {
+    if (!permission) return true;
+    return user?.roleId?.permissions?.includes(permission) ?? false;
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, isLoadingAuth, login, logout }}
+      value={{ user, isAuthenticated, isLoadingAuth, login, logout, hasPermission }}
     >
       {children}
     </AuthContext.Provider>
