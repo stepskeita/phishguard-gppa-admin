@@ -31,6 +31,14 @@ api.interceptors.response.use(
       localStorage.removeItem(TOKEN_KEY);
       window.location.replace('/login');
     }
+    // Backend-enforced (middleware/auth.js) on every route except the small
+    // exempt set /change-password itself needs — this is the safety net for
+    // any call that reaches the API before AuthContext's own redirect (see
+    // ProtectedRoute in App.jsx) has a chance to run.
+    if (error.response?.status === 403 && error.response?.data?.mustChangePassword) {
+      window.location.replace('/change-password');
+      return Promise.reject(error);
+    }
     // Mutating requests already surface permission errors via each page's
     // own onError toast (using the same response body) — only add a global
     // toast for GETs, which otherwise fail silently with no visible error.

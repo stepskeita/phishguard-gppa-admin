@@ -58,9 +58,23 @@ export const AuthProvider = ({ children }) => {
     return user?.roleId?.permissions?.includes(permission) ?? false;
   };
 
+  // Called after a successful password change so the guarded routes unlock
+  // immediately without requiring a fresh login.
+  const markPasswordChanged = () => {
+    setUser((prev) => (prev ? { ...prev, mustChangePassword: false } : prev));
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, isLoadingAuth, login, logout, hasPermission }}
+      value={{
+        user,
+        isAuthenticated,
+        isLoadingAuth,
+        login,
+        logout,
+        hasPermission,
+        markPasswordChanged,
+      }}
     >
       {children}
     </AuthContext.Provider>

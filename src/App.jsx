@@ -8,6 +8,7 @@ import {
   Route,
   Routes,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import PageNotFound from "./lib/PageNotFound";
@@ -17,6 +18,7 @@ import PermissionRequired from "@/components/shared/PermissionRequired";
 import Login from "./pages/auth/Login";
 import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPassword from "./pages/auth/ResetPassword";
+import ForcePasswordChange from "./pages/auth/ForcePasswordChange";
 import AppLayout from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import UsersList from "./pages/users/UsersList";
@@ -46,7 +48,8 @@ import AuditLogs from "./pages/AuditLogs";
 import Settings from "./pages/Settings";
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoadingAuth } = useAuth();
+  const { isAuthenticated, isLoadingAuth, user } = useAuth();
+  const location = useLocation();
 
   if (isLoadingAuth) {
     return (
@@ -56,7 +59,16 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  // Primary enforcement — redirects before any page-data API call even
+  // fires. The axios interceptor's 403 handler (see api/axios.js) is the
+  // server-enforced backstop for anything that reaches the API first.
+  if (user?.mustChangePassword && location.pathname !== "/change-password") {
+    return <Navigate to="/change-password" replace />;
+  }
+
+  return children;
 };
 
 // Renders `element` only if the signed-in admin's role has `permission`;
@@ -152,6 +164,17 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              {/* Requires auth but deliberately outside AppLayout/
+                  AuthenticatedApp — no sidebar or nav until the temp
+                  password is actually changed. */}
+              <Route
+                path="/change-password"
+                element={
+                  <ProtectedRoute>
+                    <ForcePasswordChange />
+                  </ProtectedRoute>
+                }
+              />
               {/* Protected routes */}
               <Route path="/*" element={<AuthenticatedApp />} />
             </Routes>
