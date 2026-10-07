@@ -1226,7 +1226,7 @@ export default function CreateCampaign() {
                           </p>
                         </div>
                         <span
-                          className={`text-xs px-1.5 py-0.5 rounded-full pointer-events-none ${d.status === "Active" ? "bg-green-500/10 text-green-400" : "bg-secondary text-muted-foreground"}`}
+                          className={`text-xs px-1.5 py-0.5 rounded-full pointer-events-none ${d.status === "Active" ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-secondary text-muted-foreground"}`}
                         >
                           {d.status}
                         </span>
@@ -1406,7 +1406,7 @@ export default function CreateCampaign() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
               This campaign has already been sent
             </DialogTitle>
             <DialogDescription>

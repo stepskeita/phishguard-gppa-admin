@@ -6,7 +6,7 @@ import api from "@/api/axios";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import PasswordInput from "@/components/shared/PasswordInput";
-import logo from "@/assets/logo.png";
+import logoFull from "@/assets/logo-full.jpg";
 import ThemeToggle from "@/components/shared/ThemeToggle";
 
 export default function ForcePasswordChange() {
@@ -46,10 +46,10 @@ export default function ForcePasswordChange() {
       <ThemeToggle className="absolute top-4 right-4" />
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <div className="h-20 w-20 rounded-2xl bg-white p-2 shadow-sm">
-            <img src={logo} alt="Jambarr360" className="h-full w-full object-contain" />
+          <div className="w-full rounded-2xl bg-white px-5 py-4 shadow-sm">
+            <img src={logoFull} alt="Gambia Public Procurement Authority" className="h-auto w-full" />
           </div>
-          <p className="text-sm text-muted-foreground">Admin Portal</p>
+          <p className="text-sm text-muted-foreground">PhishGuard GPPA Admin Portal</p>
         </div>
 
         <div className="bg-card border border-border rounded-xl p-6 space-y-1">

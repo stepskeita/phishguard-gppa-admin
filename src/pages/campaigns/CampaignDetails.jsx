@@ -327,7 +327,7 @@ export default function CampaignDetails() {
 
       {/* Scheduled banner */}
       {campaign.status === "Scheduled" && campaign.startDate && (
-        <div className="mb-6 flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm rounded-xl px-4 py-3">
+        <div className="mb-6 flex items-center gap-3 bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400 text-sm rounded-xl px-4 py-3">
           <Clock className="h-4 w-4 shrink-0" />
           <span>
             Scheduled to send on{" "}
@@ -850,7 +850,7 @@ export default function CampaignDetails() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
               Missing attachments
             </DialogTitle>
             <DialogDescription>

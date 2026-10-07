@@ -468,9 +468,9 @@ export default function CreateEditTemplate() {
             <span
               className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
                 deliverability.score >= 80
-                  ? "bg-green-500/10 text-green-400"
+                  ? "bg-green-500/10 text-green-700 dark:text-green-400"
                   : deliverability.score >= 50
-                    ? "bg-yellow-500/10 text-yellow-500"
+                    ? "bg-yellow-500/10 text-yellow-700 dark:text-yellow-500"
                     : "bg-destructive/10 text-destructive"
               }`}
             >
@@ -483,7 +483,7 @@ export default function CreateEditTemplate() {
             this simulation actually lands in the inbox.
           </p>
           {deliverability.flags.length === 0 ? (
-            <div className="flex items-center gap-2 text-sm text-green-400">
+            <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
               <ShieldCheck className="h-4 w-4 shrink-0" />
               No common spam-trigger patterns detected.
             </div>
@@ -497,7 +497,7 @@ export default function CreateEditTemplate() {
                     <AlertTriangle
                       className={`h-4 w-4 shrink-0 mt-0.5 ${
                         flag.severity === "medium"
-                          ? "text-yellow-500"
+                          ? "text-yellow-700 dark:text-yellow-500"
                           : "text-muted-foreground"
                       }`}
                     />

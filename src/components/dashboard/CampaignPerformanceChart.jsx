@@ -35,22 +35,22 @@ export default function CampaignPerformanceChart() {
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} barGap={2}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 20% 16%)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 11, fill: "hsl(215 20% 55%)" }}
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: "hsl(215 20% 55%)" }}
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(222 44% 8%)",
-                  border: "1px solid hsl(222 20% 16%)",
+                  backgroundColor: "hsl(var(--popover))",
+                  border: "1px solid hsl(var(--border))",
                   borderRadius: "8px",
                   fontSize: "12px",
                 }}
@@ -58,19 +58,19 @@ export default function CampaignPerformanceChart() {
               <Bar
                 dataKey="sent"
                 name="Sent"
-                fill="hsl(217 91% 60%)"
+                fill="hsl(var(--chart-1))"
                 radius={[3, 3, 0, 0]}
               />
               <Bar
                 dataKey="clicked"
                 name="Clicked"
-                fill="hsl(38 92% 50%)"
+                fill="hsl(var(--chart-3))"
                 radius={[3, 3, 0, 0]}
               />
               <Bar
                 dataKey="submitted"
                 name="Submitted"
-                fill="hsl(0 84% 60%)"
+                fill="hsl(var(--chart-5))"
                 radius={[3, 3, 0, 0]}
               />
             </BarChart>

@@ -566,7 +566,7 @@ function SendingDomainsTab() {
                     </span>
                   )}
                   <span
-                    className={`text-xs px-1.5 py-0.5 rounded-full ${d.status === "Active" ? "bg-green-500/10 text-green-400" : "bg-secondary text-muted-foreground"}`}
+                    className={`text-xs px-1.5 py-0.5 rounded-full ${d.status === "Active" ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-secondary text-muted-foreground"}`}
                   >
                     {d.status}
                   </span>
@@ -1053,7 +1053,7 @@ function DomainTab({ settings, isLoading, onSave, isPending }) {
               className="bg-secondary border-0"
             />
           )}
-          <span className="text-sm text-muted-foreground">.jambarr360.io</span>
+          <span className="text-sm text-muted-foreground">.phishguard.io</span>
         </div>
       </div>
       <div className="space-y-2">

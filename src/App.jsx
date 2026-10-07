@@ -74,7 +74,7 @@ const ProtectedRoute = ({ children }) => {
 // Renders `element` only if the signed-in admin's role has `permission`;
 // otherwise the permission-required empty state takes its place. Mirrors
 // exactly what the backend's requirePermission('module', 'Action') already
-// enforces per route (see jambarr360-backend/src/routes/*.js) — this doesn't
+// enforces per route (see phishguard-gppa-backend/src/routes/*.js) — this doesn't
 // replace that server-side check, it just avoids sending an admin to a page
 // that would only 403 once it tries to load its data.
 const RequirePermission = ({ permission, element }) => {
@@ -153,7 +153,7 @@ function App() {
   return (
     <ThemeProvider
       attribute="class"
-      defaultTheme="dark"
+      defaultTheme="light"
       storageKey="jambarr360-theme"
     >
       <AuthProvider>

@@ -45,11 +45,11 @@ export default function Sidebar({ collapsed, onToggle }) {
       {/* Logo */}
       <div className="h-16 flex items-center justify-center px-3 border-b border-sidebar-border shrink-0">
         <div className={cn("bg-white rounded-xl overflow-hidden flex items-center justify-center shrink-0", collapsed ? "h-9 w-9 p-0.5" : "h-10 w-10 p-0.5")}>
-          <img src={logo} alt="Jambarr360" className="h-full w-full object-contain" />
+          <img src={logo} alt="PhishGuard GPPA" className="h-full w-full object-contain" />
         </div>
         {!collapsed && (
           <span className="ml-2.5 text-base font-bold text-foreground tracking-tight truncate">
-            Jambarr360
+            PhishGuard GPPA
           </span>
         )}
       </div>

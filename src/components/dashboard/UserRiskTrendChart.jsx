@@ -42,29 +42,29 @@ export default function UserRiskTrendChart() {
         ) : hasTrend ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={trend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 20% 16%)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 dataKey="date"
-                tick={{ fontSize: 11, fill: "hsl(215 20% 55%)" }}
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: "hsl(215 20% 55%)" }}
+                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 axisLine={false}
                 tickLine={false}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "hsl(222 44% 8%)",
-                  border: "1px solid hsl(222 20% 16%)",
+                  backgroundColor: "hsl(var(--popover))",
+                  border: "1px solid hsl(var(--border))",
                   borderRadius: "8px",
                   fontSize: "12px",
                 }}
               />
-              <Line type="monotone" dataKey="high" name="High" stroke="hsl(0 84% 60%)" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="medium" name="Medium" stroke="hsl(38 92% 50%)" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="low" name="Low" stroke="hsl(172 66% 50%)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="high" name="High" stroke="hsl(var(--chart-5))" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="medium" name="Medium" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="low" name="Low" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         ) : dist ? (
@@ -76,17 +76,17 @@ export default function UserRiskTrendChart() {
               {
                 label: "High Risk",
                 value: dist.High ?? 0,
-                color: "hsl(0 84% 60%)",
+                color: "hsl(var(--chart-5))",
               },
               {
                 label: "Medium Risk",
                 value: dist.Medium ?? 0,
-                color: "hsl(38 92% 50%)",
+                color: "hsl(var(--chart-3))",
               },
               {
                 label: "Low Risk",
                 value: dist.Low ?? 0,
-                color: "hsl(172 66% 50%)",
+                color: "hsl(var(--chart-2))",
               },
             ].map((item) => {
               const total =

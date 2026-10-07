@@ -30,9 +30,9 @@ import KpiCard from "../../components/shared/KpiCard";
 import api from "@/api/axios";
 
 const RISK_COLORS = {
-  High: "hsl(0 84% 60%)",
-  Medium: "hsl(38 92% 50%)",
-  Low: "hsl(172 66% 50%)",
+  High: "hsl(var(--chart-5))",
+  Medium: "hsl(var(--chart-3))",
+  Low: "hsl(var(--chart-2))",
 };
 
 const REPORT_OPTIONS = [
@@ -124,7 +124,7 @@ export default function AnalyticsDashboard() {
     ? Object.entries(riskRaw).map(([name, value]) => ({
         name: `${name} Risk`,
         value,
-        color: RISK_COLORS[name] ?? "hsl(215 20% 55%)",
+        color: RISK_COLORS[name] ?? "hsl(var(--muted-foreground))",
       }))
     : [];
 
@@ -157,23 +157,23 @@ export default function AnalyticsDashboard() {
                   <BarChart data={performanceData}>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="hsl(222 20% 16%)"
+                      stroke="hsl(var(--border))"
                     />
                     <XAxis
                       dataKey="name"
-                      tick={{ fontSize: 11, fill: "hsl(215 20% 55%)" }}
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                       axisLine={false}
                       tickLine={false}
                     />
                     <YAxis
-                      tick={{ fontSize: 11, fill: "hsl(215 20% 55%)" }}
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                       axisLine={false}
                       tickLine={false}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "hsl(222 44% 8%)",
-                        border: "1px solid hsl(222 20% 16%)",
+                        backgroundColor: "hsl(var(--popover))",
+                        border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                         fontSize: "12px",
                       }}
@@ -181,13 +181,13 @@ export default function AnalyticsDashboard() {
                     <Bar
                       dataKey="clickRate"
                       name="Click Rate"
-                      fill="hsl(38 92% 50%)"
+                      fill="hsl(var(--chart-3))"
                       radius={[3, 3, 0, 0]}
                     />
                     <Bar
                       dataKey="submitRate"
                       name="Submit Rate"
-                      fill="hsl(0 84% 60%)"
+                      fill="hsl(var(--chart-5))"
                       radius={[3, 3, 0, 0]}
                     />
                   </BarChart>
@@ -218,8 +218,8 @@ export default function AnalyticsDashboard() {
                     </Pie>
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "hsl(222 44% 8%)",
-                        border: "1px solid hsl(222 20% 16%)",
+                        backgroundColor: "hsl(var(--popover))",
+                        border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                         fontSize: "12px",
                       }}
@@ -253,23 +253,23 @@ export default function AnalyticsDashboard() {
                   <LineChart data={trendData}>
                     <CartesianGrid
                       strokeDasharray="3 3"
-                      stroke="hsl(222 20% 16%)"
+                      stroke="hsl(var(--border))"
                     />
                     <XAxis
                       dataKey="month"
-                      tick={{ fontSize: 11, fill: "hsl(215 20% 55%)" }}
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                       axisLine={false}
                       tickLine={false}
                     />
                     <YAxis
-                      tick={{ fontSize: 11, fill: "hsl(215 20% 55%)" }}
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                       axisLine={false}
                       tickLine={false}
                     />
                     <Tooltip
                       contentStyle={{
-                        backgroundColor: "hsl(222 44% 8%)",
-                        border: "1px solid hsl(222 20% 16%)",
+                        backgroundColor: "hsl(var(--popover))",
+                        border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                         fontSize: "12px",
                       }}
@@ -277,9 +277,9 @@ export default function AnalyticsDashboard() {
                     <Line
                       type="monotone"
                       dataKey="count"
-                      stroke="hsl(0 84% 60%)"
+                      stroke="hsl(var(--chart-5))"
                       strokeWidth={2}
-                      dot={{ fill: "hsl(0 84% 60%)", r: 4 }}
+                      dot={{ fill: "hsl(var(--chart-5))", r: 4 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
