@@ -6,8 +6,8 @@
 const isDev = true;
 
 export const BACKEND_BASE_URL = isDev
-  ? "http://localhost:5001"
-  : "https://api.jambarr360.me";
+  ? "http://localhost:6001"
+  : "https://phishguard-api.gppa.gm";
 
 export const BACKEND_API_URL = `${BACKEND_BASE_URL}/api`;
 
