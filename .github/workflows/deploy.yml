@@ -15,4 +15,4 @@ jobs:
       - name: Build
         run: npm run build
       - name: Deploy static build
-        run: rsync -a --delete dist/ /var/www/jambarr360-admin/dist/
+        run: rsync -a --delete dist/ /var/www/phishguard-admin/dist/
