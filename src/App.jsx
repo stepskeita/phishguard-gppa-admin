@@ -79,7 +79,11 @@ const ProtectedRoute = ({ children }) => {
 // that would only 403 once it tries to load its data.
 const RequirePermission = ({ permission, element }) => {
   const { hasPermission } = useAuth();
-  return hasPermission(permission) ? element : <PermissionRequired permission={permission} />;
+  return hasPermission(permission) ? (
+    element
+  ) : (
+    <PermissionRequired permission={permission} />
+  );
 };
 
 const AuthenticatedApp = () => {
@@ -91,56 +95,314 @@ const AuthenticatedApp = () => {
               blurs individual widgets per-permission instead (Dashboard.jsx). */}
           <Route path="/" element={<Dashboard />} />
 
-          <Route path="/users" element={<RequirePermission permission="users:View" element={<UsersList />} />} />
-          <Route path="/users/create" element={<RequirePermission permission="users:Create" element={<CreateUser />} />} />
-          <Route path="/users/import" element={<RequirePermission permission="users:Create" element={<BulkImport />} />} />
-          <Route path="/users/:id" element={<RequirePermission permission="users:View" element={<UserProfile />} />} />
-          <Route path="/users/:id/edit" element={<RequirePermission permission="users:Edit" element={<EditUser />} />} />
+          <Route
+            path="/users"
+            element={
+              <RequirePermission
+                permission="users:View"
+                element={<UsersList />}
+              />
+            }
+          />
+          <Route
+            path="/users/create"
+            element={
+              <RequirePermission
+                permission="users:Create"
+                element={<CreateUser />}
+              />
+            }
+          />
+          <Route
+            path="/users/import"
+            element={
+              <RequirePermission
+                permission="users:Create"
+                element={<BulkImport />}
+              />
+            }
+          />
+          <Route
+            path="/users/:id"
+            element={
+              <RequirePermission
+                permission="users:View"
+                element={<UserProfile />}
+              />
+            }
+          />
+          <Route
+            path="/users/:id/edit"
+            element={
+              <RequirePermission
+                permission="users:Edit"
+                element={<EditUser />}
+              />
+            }
+          />
 
-          <Route path="/groups" element={<RequirePermission permission="groups:View" element={<GroupsList />} />} />
-          <Route path="/groups/create" element={<RequirePermission permission="groups:Create" element={<CreateEditGroup />} />} />
-          <Route path="/groups/:id/edit" element={<RequirePermission permission="groups:Edit" element={<CreateEditGroup />} />} />
+          <Route
+            path="/groups"
+            element={
+              <RequirePermission
+                permission="groups:View"
+                element={<GroupsList />}
+              />
+            }
+          />
+          <Route
+            path="/groups/create"
+            element={
+              <RequirePermission
+                permission="groups:Create"
+                element={<CreateEditGroup />}
+              />
+            }
+          />
+          <Route
+            path="/groups/:id/edit"
+            element={
+              <RequirePermission
+                permission="groups:Edit"
+                element={<CreateEditGroup />}
+              />
+            }
+          />
 
-          <Route path="/campaigns" element={<RequirePermission permission="campaigns:View" element={<CampaignsList />} />} />
-          <Route path="/campaigns/create" element={<RequirePermission permission="campaigns:Create" element={<CreateCampaign />} />} />
-          <Route path="/campaigns/:id/edit" element={<RequirePermission permission="campaigns:Edit" element={<CreateCampaign />} />} />
-          <Route path="/campaigns/:id" element={<RequirePermission permission="campaigns:View" element={<CampaignDetails />} />} />
+          <Route
+            path="/campaigns"
+            element={
+              <RequirePermission
+                permission="campaigns:View"
+                element={<CampaignsList />}
+              />
+            }
+          />
+          <Route
+            path="/campaigns/create"
+            element={
+              <RequirePermission
+                permission="campaigns:Create"
+                element={<CreateCampaign />}
+              />
+            }
+          />
+          <Route
+            path="/campaigns/:id/edit"
+            element={
+              <RequirePermission
+                permission="campaigns:Edit"
+                element={<CreateCampaign />}
+              />
+            }
+          />
+          <Route
+            path="/campaigns/:id"
+            element={
+              <RequirePermission
+                permission="campaigns:View"
+                element={<CampaignDetails />}
+              />
+            }
+          />
 
-          <Route path="/templates" element={<RequirePermission permission="templates:View" element={<TemplatesList />} />} />
-          <Route path="/templates/create" element={<RequirePermission permission="templates:Create" element={<CreateEditTemplate />} />} />
-          <Route path="/templates/:id/edit" element={<RequirePermission permission="templates:Edit" element={<CreateEditTemplate />} />} />
+          <Route
+            path="/templates"
+            element={
+              <RequirePermission
+                permission="templates:View"
+                element={<TemplatesList />}
+              />
+            }
+          />
+          <Route
+            path="/templates/create"
+            element={
+              <RequirePermission
+                permission="templates:Create"
+                element={<CreateEditTemplate />}
+              />
+            }
+          />
+          <Route
+            path="/templates/:id/edit"
+            element={
+              <RequirePermission
+                permission="templates:Edit"
+                element={<CreateEditTemplate />}
+              />
+            }
+          />
 
-          <Route path="/landing-pages" element={<RequirePermission permission="landing-pages:View" element={<LandingPagesList />} />} />
+          <Route
+            path="/landing-pages"
+            element={
+              <RequirePermission
+                permission="landing-pages:View"
+                element={<LandingPagesList />}
+              />
+            }
+          />
           <Route
             path="/landing-pages/create"
-            element={<RequirePermission permission="landing-pages:Create" element={<CreateEditLandingPage />} />}
+            element={
+              <RequirePermission
+                permission="landing-pages:Create"
+                element={<CreateEditLandingPage />}
+              />
+            }
           />
           <Route
             path="/landing-pages/:id/edit"
-            element={<RequirePermission permission="landing-pages:Edit" element={<CreateEditLandingPage />} />}
+            element={
+              <RequirePermission
+                permission="landing-pages:Edit"
+                element={<CreateEditLandingPage />}
+              />
+            }
           />
 
-          <Route path="/tracking-logs" element={<RequirePermission permission="tracking-logs:View" element={<TrackingLogs />} />} />
-          <Route path="/analytics" element={<RequirePermission permission="analytics:View" element={<AnalyticsDashboard />} />} />
+          <Route
+            path="/tracking-logs"
+            element={
+              <RequirePermission
+                permission="tracking-logs:View"
+                element={<TrackingLogs />}
+              />
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <RequirePermission
+                permission="analytics:View"
+                element={<AnalyticsDashboard />}
+              />
+            }
+          />
 
-          <Route path="/training" element={<RequirePermission permission="training:View" element={<TrainingContent />} />} />
-          <Route path="/training/create" element={<RequirePermission permission="training:Create" element={<CreateEditTraining />} />} />
-          <Route path="/training/:id/edit" element={<RequirePermission permission="training:Edit" element={<CreateEditTraining />} />} />
-          <Route path="/training/quizzes/create" element={<RequirePermission permission="training:Manage Quizzes" element={<QuizManagement />} />} />
-          <Route path="/training/quizzes/:id" element={<RequirePermission permission="training:Manage Quizzes" element={<QuizManagement />} />} />
+          <Route
+            path="/training"
+            element={
+              <RequirePermission
+                permission="training:View"
+                element={<TrainingContent />}
+              />
+            }
+          />
+          <Route
+            path="/training/create"
+            element={
+              <RequirePermission
+                permission="training:Create"
+                element={<CreateEditTraining />}
+              />
+            }
+          />
+          <Route
+            path="/training/:id/edit"
+            element={
+              <RequirePermission
+                permission="training:Edit"
+                element={<CreateEditTraining />}
+              />
+            }
+          />
+          <Route
+            path="/training/quizzes/create"
+            element={
+              <RequirePermission
+                permission="training:Manage Quizzes"
+                element={<QuizManagement />}
+              />
+            }
+          />
+          <Route
+            path="/training/quizzes/:id"
+            element={
+              <RequirePermission
+                permission="training:Manage Quizzes"
+                element={<QuizManagement />}
+              />
+            }
+          />
 
           {/* Both routes are gated on settings:Manage Admins, not separate
               per-module strings — matches routes/roles.js and
               routes/admins.js on the backend exactly. */}
-          <Route path="/roles" element={<RequirePermission permission="settings:Manage Admins" element={<RolesList />} />} />
-          <Route path="/roles/create" element={<RequirePermission permission="settings:Manage Admins" element={<CreateEditRole />} />} />
-          <Route path="/roles/:id/edit" element={<RequirePermission permission="settings:Manage Admins" element={<CreateEditRole />} />} />
-          <Route path="/admins" element={<RequirePermission permission="settings:Manage Admins" element={<AdminsList />} />} />
-          <Route path="/admins/create" element={<RequirePermission permission="settings:Manage Admins" element={<CreateEditAdmin />} />} />
-          <Route path="/admins/:id/edit" element={<RequirePermission permission="settings:Manage Admins" element={<CreateEditAdmin />} />} />
+          <Route
+            path="/roles"
+            element={
+              <RequirePermission
+                permission="settings:Manage Admins"
+                element={<RolesList />}
+              />
+            }
+          />
+          <Route
+            path="/roles/create"
+            element={
+              <RequirePermission
+                permission="settings:Manage Admins"
+                element={<CreateEditRole />}
+              />
+            }
+          />
+          <Route
+            path="/roles/:id/edit"
+            element={
+              <RequirePermission
+                permission="settings:Manage Admins"
+                element={<CreateEditRole />}
+              />
+            }
+          />
+          <Route
+            path="/admins"
+            element={
+              <RequirePermission
+                permission="settings:Manage Admins"
+                element={<AdminsList />}
+              />
+            }
+          />
+          <Route
+            path="/admins/create"
+            element={
+              <RequirePermission
+                permission="settings:Manage Admins"
+                element={<CreateEditAdmin />}
+              />
+            }
+          />
+          <Route
+            path="/admins/:id/edit"
+            element={
+              <RequirePermission
+                permission="settings:Manage Admins"
+                element={<CreateEditAdmin />}
+              />
+            }
+          />
 
-          <Route path="/audit-logs" element={<RequirePermission permission="audit-logs:View" element={<AuditLogs />} />} />
-          <Route path="/settings" element={<RequirePermission permission="settings:View" element={<Settings />} />} />
+          <Route
+            path="/audit-logs"
+            element={
+              <RequirePermission
+                permission="audit-logs:View"
+                element={<AuditLogs />}
+              />
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <RequirePermission
+                permission="settings:View"
+                element={<Settings />}
+              />
+            }
+          />
 
           <Route path="*" element={<PageNotFound />} />
         </Route>
@@ -154,7 +416,7 @@ function App() {
     <ThemeProvider
       attribute="class"
       defaultTheme="light"
-      storageKey="jambarr360-theme"
+      storageKey="phishguard-theme"
     >
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>

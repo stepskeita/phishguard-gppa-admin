@@ -1,7 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from "react";
 import api from "@/api/axios";
 
-const TOKEN_KEY = "jambarr360-token";
+const TOKEN_KEY = "phishguard-token";
 
 const AuthContext = createContext();
 
